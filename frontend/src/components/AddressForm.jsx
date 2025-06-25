@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiUrl } from '../config/config';
-// import '../css/AddressForm.css';
+import '../css/AddressForm.css';
 
 const AddressForm = ({ onCancel, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -249,132 +249,198 @@ const AddressForm = ({ onCancel, onSuccess }) => {
   };
 
   return (
-    <div className="address-form-container">
-      <h2>Add New Address</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Address Line 1</label>
-          <input
-            type="text"
-            name="addressLine1"
-            value={formData.addressLine1}
-            onChange={handleChange}
-            required
-          />
+    <div className="address-form-overlay">
+      <div className="address-form-container">
+        <div className="form-header">
+          <h2>
+            <span className="location-icon">📍</span>
+            Add New Address
+          </h2>
+          <button className="close-btn" onClick={onCancel}>×</button>
         </div>
-        
-        <div className="form-group">
-          <label>Address Line 2 (Optional)</label>
-          <input
-            type="text"
-            name="addressLine2"
-            value={formData.addressLine2}
-            onChange={handleChange}
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>City</label>
-          <input
-            type="text"
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>State</label>
-          <input
-            type="text"
-            name="state"
-            value={formData.state}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>Postal Code</label>
-          <div className="postal-code-container" style={{ display: 'flex' }}>
-            <input
-              type="text"
-              name="postalCode"
-              value={formData.postalCode}
-              onChange={handleChange}
-              required
-              style={{ flexGrow: 1 }}
-              placeholder="Enter 6-digit pincode"
-            />
-            <button 
-              type="button" 
-              onClick={() => formData.postalCode.length === 6 && searchPostalCode(formData.postalCode)}
-              style={{ 
-                marginLeft: '10px', 
-                padding: '0 10px',
-                backgroundColor: '#4285f4',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-              disabled={formData.postalCode.length !== 6}
-            >
-              Find
-            </button>
+
+        <form onSubmit={handleSubmit} className="address-form">
+          <div className="form-section">
+            <h3>📋 Address Details</h3>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label>
+                  <span className="label-icon">🏠</span>
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
+                  name="addressLine1"
+                  value={formData.addressLine1}
+                  onChange={handleChange}
+                  placeholder="House/Flat No., Building Name"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>
+                  <span className="label-icon">🌆</span>
+                  Address Line 2 (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="addressLine2"
+                  value={formData.addressLine2}
+                  onChange={handleChange}
+                  placeholder="Area, Landmark"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>
+                  <span className="label-icon">🏙️</span>
+                  City
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>
+                  <span className="label-icon">🗾</span>
+                  State
+                </label>
+                <input
+                  type="text"
+                  name="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group postal-code-group">
+                <label>
+                  <span className="label-icon">📮</span>
+                  Postal Code
+                </label>
+                <div className="postal-code-container">
+                  <input
+                    type="text"
+                    name="postalCode"
+                    value={formData.postalCode}
+                    onChange={handleChange}
+                    placeholder="Enter 6-digit pincode"
+                    maxLength="6"
+                    required
+                  />
+                  <button 
+                    type="button" 
+                    className="find-btn"
+                    onClick={() => formData.postalCode.length === 6 && searchPostalCode(formData.postalCode)}
+                    disabled={formData.postalCode.length !== 6}
+                  >
+                    🔍 Find
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="checkbox-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="isDefault"
+                    checked={formData.isDefault}
+                    onChange={handleChange}
+                  />
+                  <span className="checkbox-custom"></span>
+                  <span className="checkbox-text">
+                    <span className="star-icon">⭐</span>
+                    Set as default address
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
-        </div>
-        
-        <div className="form-group checkbox">
-          <input
-            type="checkbox"
-            name="isDefault"
-            checked={formData.isDefault}
-            onChange={handleChange}
-            id="defaultAddress"
-          />
-          <label htmlFor="defaultAddress">Set as default address</label>
-        </div>
-        
-        <div className="map-container">
-          <p>Click on the map to set your exact location:</p>
-          <div 
-            id="address-map" 
-            className="address-map" 
-            style={{ 
-              height: '300px', 
-              width: '100%', 
-              cursor: 'pointer',
-              position: 'relative',
-              zIndex: 1
-            }}
-          ></div>
-          {!mapLoaded && <p>Loading map...</p>}
-          
-          {selectedLocation && (
-            <div className="selected-location">
-              <p><strong>Selected coordinates:</strong> {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}</p>
-              {addressFromMap && (
-                <p><strong>Address:</strong> {addressFromMap}</p>
+
+          <div className="form-section">
+            <h3>🗺️ Location on Map</h3>
+            <p className="map-instruction">
+              Click on the map to set your exact location
+            </p>
+            
+            <div className="map-container">
+              <div 
+                id="address-map" 
+                className="address-map"
+              ></div>
+              
+              {!mapLoaded && (
+                <div className="map-loading">
+                  <div className="loading-spinner"></div>
+                  <p>Loading map...</p>
+                </div>
+              )}
+              
+              {selectedLocation && (
+                <div className="location-info">
+                  <div className="location-card">
+                    <h4>📍 Selected Location</h4>
+                    <p className="coordinates">
+                      <strong>Coordinates:</strong> {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
+                    </p>
+                    {addressFromMap && (
+                      <p className="address-preview">
+                        <strong>Address:</strong> {addressFromMap}
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
+          </div>
+
+          {error && (
+            <div className="error-message">
+              <span className="error-icon">⚠️</span>
+              {error}
+            </div>
           )}
-        </div>
-        
-        {error && <div className="error-message">{error}</div>}
-        
-        <div className="form-actions">
-          <button type="button" onClick={onCancel}>Cancel</button>
-          <button 
-            type="submit" 
-            disabled={loading || !selectedLocation}
-            className={!selectedLocation ? 'disabled-btn' : ''}
-          >
-            {loading ? 'Saving...' : 'Save Address'}
-          </button>
-        </div>
-      </form>
+
+          <div className="form-actions">
+            <button type="button" className="cancel-btn" onClick={onCancel}>
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              className={`submit-btn ${!selectedLocation ? 'disabled' : ''}`}
+              disabled={loading || !selectedLocation}
+            >
+              {loading ? (
+                <>
+                  <div className="button-spinner"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <span className="save-icon">💾</span>
+                  Save Address
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

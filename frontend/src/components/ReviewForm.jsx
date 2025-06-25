@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { apiUrl } from "../config/config";
 import RatingStars from "./RatingStars";
+import "../css/ReviewForm.css";
 
 const ReviewForm = ({ productId, onReviewSubmit }) => {
     const [rating, setRating] = useState(0);
@@ -43,17 +44,23 @@ const ReviewForm = ({ productId, onReviewSubmit }) => {
         <form className="review-form" onSubmit={handleSubmit}>
             <h3>Write a Review</h3>
             <div className="rating-input">
-                {[1, 2, 3, 4, 5].map((num) => (
-                    <button
-                        type="button"
-                        key={num}
-                        className={`star ${rating >= num ? "active" : ""}`}
-                        onClick={() => setRating(num)}
-                    >
-                        ★
-                    </button>
-                ))}
+            {[1, 2, 3, 4, 5].map((num) => (
+                <button
+                    type="button"
+                    key={num}
+                    className={`star ${rating >= num ? "active" : ""}`}
+                    onClick={() => setRating(num)}
+                >
+                    ★
+                </button>
+            ))}
+        </div>
+        {rating > 0 && (
+            <div className="selected-rating">
+                <span>Selected rating: </span>
+                <RatingStars rating={rating} />
             </div>
+        )}
             <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}

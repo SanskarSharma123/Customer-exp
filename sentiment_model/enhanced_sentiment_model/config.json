@@ -1,7 +1,0 @@
-{
-  "max_len": 128,
-  "n_classes": 5,
-  "model_type": "EnhancedSentimentClassifier",
-  "trained_on_full_dataset": true,
-  "dataset_size": 11545
-}

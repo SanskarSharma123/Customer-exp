@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg2-binary
+langchain
+langchain_ollama
+python-dotenv
+requests
+ollama

@@ -6,7 +6,7 @@ import Footer from "./components/Footer";
 import ProductDetails from "./pages/ProductDetails";
 // import AddressForm from "./components/AddressForm";
 // import ProductCard from "./components/ProductCard";
-
+import Chatbot from "./components/Chatbot"; // Add this import
 import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
@@ -109,6 +109,7 @@ function App() {
         </Routes>
       </main>
       <Footer />
+      <Chatbot />
     </div>
     </ThemeProvider>
   );

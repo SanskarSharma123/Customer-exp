@@ -22,11 +22,11 @@ app.use(cors({
 
 // PostgreSQL connection pool
 const pool = new Pool({
-  user: process.env.DB_USER || 'sanskar',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'ecommerce',
-  password: process.env.DB_PASSWORD || 'hatebitches1',
-  port: process.env.DB_PORT || 5432,
+  user:  'postgres',
+  host: 'localhost',
+  database: 'database3',
+  password: 'Helloace@135',
+  port: 5433,
 });
 
 // Secret key for JWT

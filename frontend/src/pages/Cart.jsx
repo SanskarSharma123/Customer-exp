@@ -17,37 +17,19 @@ const Cart = () => {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: "", type: "" });
   const navigate = useNavigate();
-
-  useEffect(() => {
+useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch cart
-        const cartResponse = await fetch(`${apiUrl}/cart`, {
-          credentials: "include",
-        });
-        if (!cartResponse.ok) {
-          throw new Error("Failed to fetch cart");
-        }
+        const cartResponse = await fetch(`${apiUrl}/cart`, { credentials: "include" });
         const cartData = await cartResponse.json();
         setCart(cartData);
 
-        // Fetch addresses
-        const profileResponse = await fetch(`${apiUrl}/profile`, {
-          credentials: "include",
-        });
-        if (!profileResponse.ok) {
-          throw new Error("Failed to fetch profile");
-        }
+        const profileResponse = await fetch(`${apiUrl}/profile`, { credentials: "include" });
         const profileData = await profileResponse.json();
         setAddresses(profileData.addresses);
 
-        // Set default address if available
-        const defaultAddress = profileData.addresses.find(
-          (addr) => addr.is_default
-        );
-        if (defaultAddress) {
-          setSelectedAddress(defaultAddress.address_id);
-        }
+        const defaultAddress = profileData.addresses.find(addr => addr.is_default);
+        if (defaultAddress) setSelectedAddress(defaultAddress.address_id);
 
         setLoading(false);
       } catch (error) {
@@ -57,7 +39,21 @@ const Cart = () => {
     };
 
     fetchData();
-  }, []);
+
+    const handleCartUpdate = (e) => {
+      if (e.key === "cart_updated" || e.type === "cart_updated_manual") {
+        fetchData();
+      }
+    };
+
+    window.addEventListener("storage", handleCartUpdate);
+    window.addEventListener("cart_updated_manual", handleCartUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleCartUpdate);
+      window.removeEventListener("cart_updated_manual", handleCartUpdate);
+    };
+}, []);
 
   // Auto-hide notifications
   useEffect(() => {

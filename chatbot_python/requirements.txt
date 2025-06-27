@@ -8,3 +8,5 @@ langchain_ollama
 python-dotenv
 requests
 ollama
+flask
+requests

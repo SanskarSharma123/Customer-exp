@@ -1,6 +1,8 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
+from urllib.parse import quote_plus
+
 DB_USER = "postgres"
-DB_PASSWORD = "Helloace@135"
+DB_PASSWORD = quote_plus("Helloace@135") 
 DB_HOST = "localhost"
 DB_PORT = "5433"
 DB_NAME = "database3"

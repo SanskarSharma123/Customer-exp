@@ -1,11 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from intent_service import classify_intent
 from prompt.get_category import get_category_prompt
+from prompt.get_category_min_max import get_category_min_max
+from prompt.get_product_id_prompt import get_productid_quantity
 from langchain_ollama import OllamaLLM
+import requests
+import json
+
 
 # Import intent handlers
+from handlers.category_min_max_browsing import handle_category_min_max_browsing
 from handlers.category_browsing import handle_category_browsing
 from handlers.product_search import handle_product_search
 from handlers.product_details import handle_product_details
@@ -25,6 +31,7 @@ from handlers.wishlist_management import handle_wishlist_management
 from handlers.product_recommendation import handle_product_recommendation
 from handlers.review_ratings import handle_review_ratings
 from handlers.faqs import handle_faqs
+
 # from handlers.greet import handle_greet
 # from handlers.goodbye import handle_goodbye
 categories = [
@@ -39,19 +46,25 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],  # Only allow your React app
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 model = OllamaLLM(model="gemma3:latest")
 
 class Query(BaseModel):
     message: str
 
+
 @app.post("/api/intent")
-def detect_intent(query: Query):
+def detect_intent(query: Query, request: Request):
+    token = request.cookies.get("token")
+
+    if not token:
+        return {"error": "Authentication token missing"}
     intent = classify_intent(query.message)
 
     if intent == "category_listing":
@@ -87,7 +100,73 @@ def detect_intent(query: Query):
         except Exception as e:
             return {"error": str(e)}
 
+    elif intent == "category_min_max_browsing":
+        try:
+            prompt = get_category_min_max(query.message)
+            result = model.invoke(prompt).strip()
+            result = result.replace("```json", "").replace("```", "").strip()
+            # print("LLM RAW OUTPUT:", result)
+
+            extracted = json.loads(result)
+            category_name = extracted.get("category")
+            min_price = extracted.get("min_price")
+            max_price = extracted.get("max_price")
+
+            if not category_name or category_name.strip().title() not in categories:
+                return {"response": "Unable to extract category from your message. Please try again or ask to list available categories."}
+
+            min_price = None if min_price in [None, "None", "null"] else min_price
+            max_price = None if max_price in [None, "None", "null"] else max_price
+
+            # Apply defaults
+            min_price = min_price if min_price is not None else 0
+            max_price = max_price if max_price is not None else 100000
+
+            products = handle_category_min_max_browsing(category_name, min_price, max_price)
+
+            if isinstance(products, dict) and "error" in products:
+                return products
+
+            return {"action": "show_products", "products": products}
+
+        except Exception as e:
+            return {"error": str(e)}
+
+    elif intent == "cart_management":
+        try:
+            prompt = get_productid_quantity(query.message)
+            result = model.invoke(prompt).strip()
+            result = result.replace("```json", "").replace("```", "").strip()
+
+            data = json.loads(result)
+
+            product_id = data.get("product_id")
+            quantity = data.get("quantity", 1)  # Default to 1 if not provided
+            print("Extracted Product ID:", product_id)
+            print("Quantuiuity:",quantity)
+
+            if not product_id:
+                return {"response": "Please specify the product ID to add to cart."}
+            
+
+            cart_res = requests.post(
+                "http://localhost:5000/api/cart/items",
+                json={"productId": product_id, "quantity": quantity},
+                cookies={"token": token}  # CORRECT way to send cookies
+            )
+
+
+
+
+            if cart_res.status_code == 201:
+                return {"action": "add_to_cart_success"}
+            else:
+                return {"action": "add_to_cart_failed"}
+
+        except Exception as e:
+            return {"error": str(e)}
         
+
     elif intent == "product_search":
         result = handle_product_search(query.message)
     elif intent == "product_details":
@@ -96,8 +175,6 @@ def detect_intent(query: Query):
         result = handle_price_filter(query.message)
     elif intent == "offers_discounts":
         result = handle_offers_discounts(query.message)
-    elif intent == "cart_management":
-        result = handle_cart_management(query.message)
     elif intent == "order_placement":
         result = handle_order_placement(query.message)
     elif intent == "order_tracking":

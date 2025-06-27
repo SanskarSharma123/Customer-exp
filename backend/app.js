@@ -20,6 +20,7 @@ app.use(cors({
 }));
 
 
+
 // PostgreSQL connection pool
 const pool = new Pool({
   user:  'postgres',
@@ -34,8 +35,24 @@ const JWT_SECRET = process.env.JWT_SECRET || 'quickcommerce-secret-key';
 
 // Middleware to authenticate JWT
 const authenticateToken = (req, res, next) => {
-  const token = req.cookies.token;
-  
+  let token = req.cookies.token;
+
+  // Fallback to manually parsing from raw headers if not found in req.cookies
+  if (!token && req.headers.cookie) {
+    const tokenMatch = req.headers.cookie.match(/token=([^;]+)/);
+    if (tokenMatch) {
+      token = tokenMatch[1];
+    }
+  }
+
+  // Fallback to Authorization header: Bearer <token>
+  if (!token && req.headers.authorization) {
+    const parts = req.headers.authorization.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      token = parts[1];
+    }
+  }
+
   if (!token) {
     return res.status(401).json({ message: 'Unauthorized: No token provided' });
   }
@@ -48,6 +65,7 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
 
 // Middleware to check if user is admin
 const isAdmin = (req, res, next) => {

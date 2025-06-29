@@ -73,7 +73,7 @@ def detect_intent(query: Query, request: Request):
                 return {
                     "categories": categories,
                     "response": response_text,
-                    "intent": "category_listing"
+                    "action": "category_listing"
                 }
     
     elif intent == "switch_mode":
@@ -105,7 +105,6 @@ def detect_intent(query: Query, request: Request):
             prompt = get_category_min_max(query.message)
             result = model.invoke(prompt).strip()
             result = result.replace("```json", "").replace("```", "").strip()
-            # print("LLM RAW OUTPUT:", result)
 
             extracted = json.loads(result)
             category_name = extracted.get("category")
@@ -141,34 +140,132 @@ def detect_intent(query: Query, request: Request):
             data = json.loads(result)
 
             product_id = data.get("product_id")
-            quantity = data.get("quantity", 1)  # Default to 1 if not provided
-            print("Extracted Product ID:", product_id)
-            print("Quantuiuity:",quantity)
+            quantity = data.get("quantity")  # Default to 1 if not provided
+            action = data.get("action")
+
 
             if not product_id:
                 return {"response": "Please specify the product ID to add to cart."}
             
+            if action == "positive":
 
-            cart_res = requests.post(
-                "http://localhost:5000/api/cart/items",
-                json={"productId": product_id, "quantity": quantity},
-                cookies={"token": token}  # CORRECT way to send cookies
-            )
+                if quantity is None:
+                    quantity = 1  
+                cart_res = requests.post(
+                    "http://localhost:5000/api/cart/items",
+                    json={"productId": product_id, "quantity": quantity},
+                    cookies={"token": token}  
+                )
 
 
 
 
-            if cart_res.status_code == 201:
-                return {"action": "add_to_cart_success"}
-            else:
-                return {"action": "add_to_cart_failed"}
+                if cart_res.status_code == 201:
+                    return {"action": "add_to_cart_success"}
+                else:
+                    return {"action": "add_to_cart_failed"}
+
+            elif action == "negative":
+                # Fetch cart to get item_id and current quantity
+                cart_res = requests.get(
+                    "http://localhost:5000/api/cart",
+                    cookies={"token": token}
+                )
+
+                if cart_res.status_code != 200:
+                    return {"action": "cart_update_failed"}
+
+                cart_data = cart_res.json()
+                item_id = None
+                current_quantity = None
+
+                for item in cart_data.get("items", []):
+                    if item.get("product_id") == product_id:
+                        item_id = item.get("cart_item_id")
+                        current_quantity = item.get("quantity")
+                        break
+
+                if not item_id:
+                    return {"response": "Item not found in cart."}
+
+                # Remove Item Completely if quantity missing
+                if quantity is None:
+                    del_res = requests.delete(
+                        f"http://localhost:5000/api/cart/items/{item_id}",
+                        cookies={"token": token}
+                    )
+                    if del_res.status_code == 200:
+                        return {"action": "cart_item_removed"}
+                    else:
+                        return {"action": "cart_remove_failed"}
+
+                # Decrease Quantity (put request)
+                else:
+                    if current_quantity is None:
+                        return {"response": "Unable to fetch current quantity."}
+
+                    new_quantity = current_quantity - quantity
+
+                    if new_quantity <= 0:
+                        # Remove item if new quantity is 0 or less
+                        del_res = requests.delete(
+                            f"http://localhost:5000/api/cart/items/{item_id}",
+                            cookies={"token": token}
+                        )
+                        if del_res.status_code == 200:
+                            return {"action": "cart_item_removed"}
+                        else:
+                            return {"action": "cart_remove_failed"}
+
+                    else:
+                        # Update with decreased quantity
+                        update_res = requests.put(
+                            f"http://localhost:5000/api/cart/items/{item_id}",
+                            json={"quantity": new_quantity},
+                            cookies={"token": token}
+                        )
+                        if update_res.status_code == 200:
+                            return {"action": "cart_item_updated"}
+                        else:
+                            return {"action": "cart_update_failed"}
+
 
         except Exception as e:
             return {"error": str(e)}
-        
+    
 
-    elif intent == "product_search":
-        result = handle_product_search(query.message)
+    elif intent == "specific_product_details":
+            prompt = get_productid_quantity(query.message)
+            result = model.invoke(prompt).strip()
+            result = result.replace("```json", "").replace("```", "").strip()
+
+            data = json.loads(result)
+
+            product_id = data.get("product_id")
+            if not product_id:
+                return {"action": "product_details_failed", "message": "Product ID not found"}
+
+            try:
+                response = requests.get(
+                    f"http://localhost:5000/api/products/{product_id}"
+                )
+
+                if response.status_code == 200:
+                    product_data = response.json()
+                    return {
+                        "action": "open_product_page",
+                        "product": product_data
+                    }
+                elif response.status_code == 404:
+                    return {"action": "product_not_found", "message": "Product not found"}
+                else:
+                    return {"action": "product_details_failed", "message": "Error fetching product"}
+
+            except Exception as e:
+                print("Product details fetch error:", e)
+                return {"action": "product_details_failed", "message": "Server error"}
+
+
     elif intent == "product_details":
         result = handle_product_details(query.message)
     elif intent == "price_filter":

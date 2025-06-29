@@ -4,18 +4,30 @@ You are an extraction expert for an eCommerce chatbot.
 
 From the user's message, extract:
 
-product_id and quantity of the product that the user wants to add to cart
+- "product_id" → The product the user refers to.
+- "quantity" → If mentioned, extract the quantity (always a positive number). If not mentioned, set to null.
+- "action" → Detect if user wants to "positive" (add/increase) or "negative" (remove/decrease).
 
-If product_id is not mentioned set it to null.
-If price is not mentioned, set to value 1
+⚠️ VERY IMPORTANT:
+- If product_id is not mentioned, set to null.
+- If action is not clearly mentioned, set to "positive" by default.
+- If quantity is not mentioned, set to null.
+- Reply strictly with **ONLY JSON**, no extra text, no explanation.
 
-⚠️ VERY IMPORTANT: Reply strictly with **ONLY JSON**, no explanations, no extra text.
-
-Example format:
+Example:
 
 {{
   "product_id": 106,
   "quantity": 2,
+  "action": "positive"
+}}
+
+OR
+
+{{
+  "product_id": 34,
+  "quantity": null,
+  "action": "negative"
 }}
 
 User message:

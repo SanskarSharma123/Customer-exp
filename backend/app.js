@@ -22,12 +22,13 @@ app.use(cors({
 
 // PostgreSQL connection pool
 const pool = new Pool({
-  user: process.env.DB_USER || 'sanskar',
+  user: process.env.DB_USER || 'vidya',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'ecommerce',
-  password: process.env.DB_PASSWORD || 'hatebitches1',
+  database: process.env.DB_NAME || 'quick_commerce',
+  password: process.env.DB_PASSWORD || 'commerceproject',
   port: process.env.DB_PORT || 5432,
 });
+
 
 // Secret key for JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'quickcommerce-secret-key';
@@ -111,21 +112,57 @@ app.post('/api/register', async (req, res) => {
 });
 
 
-// Get all products
+// Get all products with category and subcategory information
 app.get('/api/products', async (req, res) => {
   try {
-    const products = await pool.query(`
-      SELECT p.*, 
-        COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
-      FROM products p
-      LEFT JOIN reviews r ON p.product_id = r.product_id
-      GROUP BY p.product_id
+    // First, check if subcategories table exists
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'subcategories'
+      );
     `);
-    res.json(products.rows);
+    
+    let result;
+    if (tableExists.rows[0].exists) {
+      // Use the new query with subcategories
+      result = await pool.query(`
+        SELECT p.*, c.name as category_name, sc.name as subcategory_name,
+               COALESCE(AVG(r.rating), 0) as average_rating,
+               COUNT(r.rating) as review_count
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN subcategories sc ON p.subcategory_id = sc.subcategory_id
+        LEFT JOIN reviews r ON p.product_id = r.product_id
+        GROUP BY p.product_id, c.name, sc.name
+        ORDER BY p.created_at DESC
+      `);
+    } else {
+      // Fallback to the old query without subcategories
+      console.log('Subcategories table not found, using fallback query');
+      result = await pool.query(`
+        SELECT p.*, c.name as category_name,
+               COALESCE(AVG(r.rating), 0) as average_rating,
+               COUNT(r.rating) as review_count
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN reviews r ON p.product_id = r.product_id
+        GROUP BY p.product_id, c.name
+        ORDER BY p.created_at DESC
+      `);
+      
+      // Add null subcategory_name to each row
+      result.rows = result.rows.map(row => ({
+        ...row,
+        subcategory_name: null
+      }));
+    }
+    
+    res.json(result.rows);
   } catch (error) {
-    console.error('Products fetch error:', error);
-    res.status(500).json({ message: 'Server error fetching products' });
+    console.error('Error fetching products:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
@@ -311,6 +348,86 @@ app.get('/api/products/search', async (req, res) => {
   }
 });
 
+// Product comparison endpoint
+app.get('/api/products/compare', async (req, res) => {
+  try {
+    console.log('Comparison request received:', req.query);
+    const { ids } = req.query;
+    if (!ids) {
+      return res.status(400).json({ message: 'Product IDs are required' });
+    }
+    const productIds = ids.split(',').map(id => parseInt(id.trim()));
+    console.log('Parsed product IDs:', productIds);
+    if (productIds.length !== 2) {
+      return res.status(400).json({ message: 'Please select exactly 2 products to compare' });
+    }
+
+    // Correct query for PostgreSQL with subcategory support
+    console.log('Executing query with product IDs:', productIds);
+    const result = await pool.query(`
+      SELECT p.*, c.name as category_name, sc.name as subcategory_name,
+             COALESCE(AVG(r.rating), 0) as average_rating,
+             COUNT(r.rating) as review_count
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN subcategories sc ON p.subcategory_id = sc.subcategory_id
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      WHERE p.product_id = ANY($1)
+      GROUP BY p.product_id, c.name, sc.name
+    `, [productIds]);
+    const products = result.rows;
+    console.log('Query result - products found:', products.length);
+
+    if (products.length !== 2) {
+      return res.status(404).json({ message: 'One or more products not found' });
+    }
+
+    // Validate that products belong to the same category
+    const categories = products.map(p => p.category_id);
+    if (categories[0] !== categories[1]) {
+      return res.status(400).json({ 
+        message: 'Products must belong to the same category for comparison',
+        category1: products[0].category_name,
+        category2: products[1].category_name
+      });
+    }
+
+    // Check if products belong to the same subcategory (optional validation)
+    const subcategories = products.map(p => p.subcategory_id);
+    const sameSubcategory = subcategories[0] === subcategories[1];
+
+    // Get common attributes for comparison
+    const commonAttributes = [
+      { name: 'Name', values: products.map(p => p.name) },
+      { name: 'Category', values: products.map(p => p.category_name) },
+      { name: 'Subcategory', values: products.map(p => p.subcategory_name || 'N/A') },
+      { name: 'Price', values: products.map(p => p.price) },
+      { name: 'Discount Price', values: products.map(p => p.discount_price) },
+      { name: 'Stock Quantity', values: products.map(p => p.stock_quantity) },
+      { name: 'Unit', values: products.map(p => p.unit) },
+      { name: 'Featured', values: products.map(p => p.is_featured ? 'Yes' : 'No') },
+      { name: 'Average Rating', values: products.map(p => {
+        const rating = parseFloat(p.average_rating);
+        return !isNaN(rating) ? rating.toFixed(1) : 'No ratings';
+      }) },
+      { name: 'Review Count', values: products.map(p => p.review_count || 0) }
+    ];
+
+    console.log('Sending response with products and attributes');
+    res.json({
+      products,
+      commonAttributes,
+      categoryName: products[0].category_name,
+      subcategoryName: products[0].subcategory_name,
+      sameSubcategory
+    });
+
+  } catch (error) {
+    console.error('Error in product comparison:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Get cart contents
 app.get('/api/cart', authenticateToken, async (req, res) => {
   try {
@@ -474,8 +591,6 @@ app.delete('/api/cart/items/:itemId', authenticateToken, async (req, res) => {
   }
 });
 
-// Place an order
-// Place an order
 // Add review routes
 app.post('/api/products/:productId/reviews', authenticateToken, async (req, res) => {
   try {
@@ -509,65 +624,6 @@ app.post('/api/products/:productId/reviews', authenticateToken, async (req, res)
       res.status(500).json({ message: 'Server error creating review' });
   }
 });
-
-// Comparion of products
-app.get('/api/products/compare', async (req, res) => {
-  try {
-    const productIds = req.query.ids.split(',').map(id => parseInt(id.trim()));
-    
-    if (productIds.length !== 2) {
-      return res.status(400).json({ message: 'Please select exactly 2 products to compare' });
-    }
-
-    const products = await pool.query(`
-      SELECT p.*, 
-        COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
-      FROM products p
-      LEFT JOIN reviews r ON p.product_id = r.product_id
-      WHERE p.product_id = ANY($1)
-      GROUP BY p.product_id
-    `, [productIds]);
-
-    if (products.rows.length !== 2) {
-      return res.status(404).json({ message: 'One or more products not found' });
-    }
-
-    // Structure the data for comparison
-    const comparisonData = {
-      products: products.rows,
-      commonAttributes: getCommonAttributes(products.rows[0], products.rows[1])
-    };
-
-    res.json(comparisonData);
-  } catch (error) {
-    console.error('Comparison error:', error);
-    res.status(500).json({ message: 'Server error during comparison' });
-  }
-});
-
-// Helper function (add with other utility functions)
-function getCommonAttributes(product1, product2) {
-  const attributes = [];
-  const keys = new Set([...Object.keys(product1), ...Object.keys(product2)]);
-  
-  // Exclude fields that shouldn't be compared
-  const excludedFields = new Set([
-    'product_id', 'image_url', 'created_at', 
-    'updated_at', 'average_rating', 'review_count'
-  ]);
-
-  for (const key of keys) {
-    if (!excludedFields.has(key) && product1[key] !== undefined && product2[key] !== undefined) {
-      attributes.push({
-        name: key.replace(/_/g, ' '), // Convert snake_case to readable
-        values: [product1[key], product2[key]]
-      });
-    }
-  }
-
-  return attributes;
-}
 
 // Get product reviews
 app.get('/api/products/:productId/reviews', async (req, res) => {
@@ -1058,43 +1114,6 @@ app.get('/api/orders/:orderId/tracking', authenticateToken, async (req, res) => 
     });
   }
 });
-
-// Get order tracking
-// app.get('/api/orders/:orderId/tracking', authenticateToken, async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-    
-//     // Verify the order belongs to the user
-//     const orders = await pool.query(
-//       'SELECT * FROM orders WHERE order_id = $1 AND user_id = $2',
-//       [orderId, req.user.userId]
-//     );
-    
-//     if (orders.rows.length === 0) {
-//       return res.status(404).json({ message: 'Order not found' });
-//     }
-    
-//     const tracking = await pool.query(
-//       `SELECT ot.*, dp.name as delivery_person_name, dp.phone as delivery_person_phone 
-//        FROM order_tracking ot
-//        LEFT JOIN delivery_personnel dp ON ot.personnel_id = dp.personnel_id
-//        WHERE ot.order_id = $1
-//        ORDER BY ot.timestamp ASC`,
-//       [orderId]
-//     );
-    
-//     res.json({
-//       orderId,
-//       status: orders.rows[0].status,
-//       estimatedDeliveryTime: orders.rows[0].estimated_delivery_time,
-//       actualDeliveryTime: orders.rows[0].actual_delivery_time,
-//       tracking: tracking.rows
-//     });
-//   } catch (error) {
-//     console.error('Tracking fetch error:', error);
-//     res.status(500).json({ message: 'Server error fetching tracking information' });
-//   }
-// });
 
 // ADMIN ROUTES
 
@@ -1700,7 +1719,147 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
+// Test endpoint to verify backend is working
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Backend is working!', timestamp: new Date().toISOString() });
+});
 
+// Test endpoint to check products in database
+app.get('/api/test/products', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT product_id, name FROM products LIMIT 5');
+    res.json({ 
+      message: 'Database connection working!', 
+      productCount: result.rows.length,
+      sampleProducts: result.rows 
+    });
+  } catch (error) {
+    console.error('Database test error:', error);
+    res.status(500).json({ message: 'Database connection failed', error: error.message });
+  }
+});
+
+// Get subcategories for a category
+app.get('/api/subcategories/:categoryId', async (req, res) => {
+  try {
+    // Check if subcategories table exists
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'subcategories'
+      );
+    `);
+    
+    if (!tableExists.rows[0].exists) {
+      return res.json([]);
+    }
+    
+    const { categoryId } = req.params;
+    const result = await pool.query(`
+      SELECT subcategory_id, name, description
+      FROM subcategories
+      WHERE category_id = $1
+      ORDER BY name
+    `, [categoryId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get all subcategories
+app.get('/api/subcategories', async (req, res) => {
+  try {
+    // Check if subcategories table exists
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'subcategories'
+      );
+    `);
+    
+    if (!tableExists.rows[0].exists) {
+      return res.json([]);
+    }
+    
+    const result = await pool.query(`
+      SELECT sc.subcategory_id, sc.name, sc.description, c.name as category_name
+      FROM subcategories sc
+      JOIN categories c ON sc.category_id = c.category_id
+      ORDER BY c.name, sc.name
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching all subcategories:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get single product with category and subcategory information
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(`
+      SELECT p.*, c.name as category_name, sc.name as subcategory_name,
+             COALESCE(AVG(r.rating), 0) as average_rating,
+             COUNT(r.rating) as review_count
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN subcategories sc ON p.subcategory_id = sc.subcategory_id
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      WHERE p.product_id = $1
+      GROUP BY p.product_id, c.name, sc.name
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get subcategory name by ID
+app.get('/api/subcategories/name/:subcategoryId', async (req, res) => {
+  try {
+    // Check if subcategories table exists
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'subcategories'
+      );
+    `);
+    
+    if (!tableExists.rows[0].exists) {
+      return res.status(404).json({ message: 'Subcategories not available' });
+    }
+    
+    const { subcategoryId } = req.params;
+    const result = await pool.query(`
+      SELECT name
+      FROM subcategories
+      WHERE subcategory_id = $1
+    `, [subcategoryId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Subcategory not found' });
+    }
+    
+    res.json({ name: result.rows[0].name });
+  } catch (error) {
+    console.error('Error fetching subcategory name:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 module.exports = app;
 

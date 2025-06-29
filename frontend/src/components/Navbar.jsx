@@ -1,30 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
+import { useCompare } from "../contexts/CompareContext";
 import "../css/Navbar.css";
 
 const Navbar = ({ isLoggedIn, user, handleLogout }) => {
   const { darkMode, toggleDarkMode } = useTheme();
-  const [selectedProducts, setSelectedProducts] = useState([]);
+  const { selectedProducts, clearCompare } = useCompare();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
-
-  // Watch for changes in localStorage for compareProducts
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const products = JSON.parse(localStorage.getItem('compareProducts') || '[]');
-      setSelectedProducts(products);
-    };
-
-    handleStorageChange(); // Initial load
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -198,15 +184,15 @@ const Navbar = ({ isLoggedIn, user, handleLogout }) => {
           {isLoggedIn ? (
             <>
               <Link to="/dashboard" className="mobile-link" onClick={toggleMobileMenu}>
-                <span className="nav-icon">🏠</span>
+                <span className="mobile-icon">🏠</span>
                 Home
               </Link>
               <Link to="/products" className="mobile-link" onClick={toggleMobileMenu}>
-                <span className="nav-icon">📦</span>
+                <span className="mobile-icon">📦</span>
                 Products
               </Link>
               <Link to="/cart" className="mobile-link" onClick={toggleMobileMenu}>
-                <span className="nav-icon">🛒</span>
+                <span className="mobile-icon">🛒</span>
                 Cart
               </Link>
               {selectedProducts.length > 0 && (
@@ -215,24 +201,23 @@ const Navbar = ({ isLoggedIn, user, handleLogout }) => {
                     goToComparison();
                     toggleMobileMenu();
                   }}
-                  className="mobile-link compare-mobile"
+                  className="mobile-compare-button"
                 >
-                  <span className="nav-icon">⚖️</span>
+                  <span className="mobile-icon">⚖️</span>
                   Compare ({selectedProducts.length}/2)
                 </button>
               )}
-              <div className="mobile-divider"></div>
               <Link to="/profile" className="mobile-link" onClick={toggleMobileMenu}>
-                <span className="nav-icon">👤</span>
+                <span className="mobile-icon">👤</span>
                 Profile
               </Link>
               <Link to="/orders" className="mobile-link" onClick={toggleMobileMenu}>
-                <span className="nav-icon">📋</span>
+                <span className="mobile-icon">📋</span>
                 My Orders
               </Link>
               {user?.isAdmin && (
-                <Link to="/admin" className="mobile-link" onClick={toggleMobileMenu}>
-                  <span className="nav-icon">⚙️</span>
+                <Link to="/admin" className="mobile-link admin-link" onClick={toggleMobileMenu}>
+                  <span className="mobile-icon">⚙️</span>
                   Admin Panel
                 </Link>
               )}
@@ -243,21 +228,22 @@ const Navbar = ({ isLoggedIn, user, handleLogout }) => {
                   toggleMobileMenu();
                 }}
               >
-                <span className="nav-icon">🚪</span>
+                <span className="mobile-icon">🚪</span>
                 Logout
               </button>
             </>
           ) : (
             <>
               <Link to="/products" className="mobile-link" onClick={toggleMobileMenu}>
-                <span className="nav-icon">📦</span>
+                <span className="mobile-icon">📦</span>
                 Products
               </Link>
-              <div className="mobile-divider"></div>
               <Link to="/login" className="mobile-link" onClick={toggleMobileMenu}>
+                <span className="mobile-icon">🔑</span>
                 Login
               </Link>
               <Link to="/signup" className="mobile-link" onClick={toggleMobileMenu}>
+                <span className="mobile-icon">📝</span>
                 Sign Up
               </Link>
             </>

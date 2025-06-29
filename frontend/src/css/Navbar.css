@@ -450,6 +450,38 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.mobile-compare-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 12px;
+  margin: 8px 0;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.mobile-compare-button:hover {
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.mobile-icon {
+  font-size: 18px;
+  width: 20px;
+  text-align: center;
+}
+
 /* Responsive Design */
 .desktop-only {
   display: flex;

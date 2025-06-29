@@ -64,9 +64,41 @@ const Products = () => {
           fetch(`${apiUrl}/products`) // Fetch ALL products for accurate counting
         ]);
 
+        // Check if any of the responses are not ok
+        if (!categoriesRes.ok) {
+          throw new Error(`Failed to fetch categories: ${categoriesRes.status}`);
+        }
+        if (!allProductsRes.ok) {
+          throw new Error(`Failed to fetch products: ${allProductsRes.status}`);
+        }
+
         const categoriesData = await categoriesRes.json();
         const productsData = await productsRes.json();
         const allProductsData = await allProductsRes.json();
+
+        // Check if any response contains an error message
+        if (categoriesData.message) {
+          throw new Error(categoriesData.message);
+        }
+        if (allProductsData.message) {
+          throw new Error(allProductsData.message);
+        }
+
+        // Validate that all API responses are arrays
+        if (!Array.isArray(categoriesData)) {
+          console.error('Invalid categoriesData:', categoriesData);
+          throw new Error('Failed to fetch categories data. Please try again.');
+        }
+
+        if (!Array.isArray(productsData)) {
+          console.error('Invalid productsData:', productsData);
+          throw new Error('Failed to fetch products data. Please try again.');
+        }
+
+        if (!Array.isArray(allProductsData)) {
+          console.error('Invalid allProductsData:', allProductsData);
+          throw new Error('Failed to fetch products data. Please try again.');
+        }
 
         // Process all products data for counting
         const processedAllProducts = allProductsData.map(product => ({

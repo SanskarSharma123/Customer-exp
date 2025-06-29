@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '../config/config';
+import { useCompare } from '../contexts/CompareContext';
 import '../css/ComparisonPage.css';
 import productImages from "../components/ProductImages";
 
@@ -12,6 +13,7 @@ const ComparisonPage = () => {
   const [highlightDifferences, setHighlightDifferences] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { clearCompare } = useCompare();
 
   useEffect(() => {
     const fetchComparisonData = async () => {
@@ -27,13 +29,36 @@ const ComparisonPage = () => {
         setComparisonData(response.data);
         setLoading(false);
       } catch (err) {
-        setError(err.message);
+        // Handle category mismatch error specifically
+        if (err.response?.status === 400 && err.response?.data?.message?.includes('same category')) {
+          setError({
+            type: 'category_mismatch',
+            message: err.response.data.message,
+            category1: err.response.data.category1,
+            category2: err.response.data.category2
+          });
+        } else {
+          setError({
+            type: 'general',
+            message: err.message || 'Failed to load comparison data'
+          });
+        }
         setLoading(false);
       }
     };
 
     fetchComparisonData();
   }, [location.search]);
+
+  const handleBackToProducts = () => {
+    clearCompare(); // Clear the compare selection
+    navigate('/products');
+  };
+
+  const handleContinueShopping = () => {
+    clearCompare(); // Clear the compare selection
+    navigate('/products');
+  };
 
   // Helper function to get product image
   const getProductImage = (product) => {
@@ -58,7 +83,7 @@ const ComparisonPage = () => {
     const higherIsBetter = ['rating', 'warranty', 'capacity', 'memory', 'storage'];
     // Define attributes where lower is better
     const lowerIsBetter = ['price', 'weight'];
-    
+
     const attributeLower = attributeName.toLowerCase();
     
     if (higherIsBetter.some(attr => attributeLower.includes(attr))) {
@@ -84,8 +109,27 @@ const ComparisonPage = () => {
       <div className="comparison-error">
         <div className="error-icon">⚠️</div>
         <h3>Error Loading Comparison</h3>
-        <p>{error}</p>
-        <button onClick={() => navigate(-1)} className="retry-button">
+        {error.type === 'category_mismatch' ? (
+          <div className="category-mismatch-error">
+            <p>{error.message}</p>
+            <div className="category-details">
+              <div className="category-item">
+                <span className="category-label">Product 1 Category:</span>
+                <span className="category-name">{error.category1}</span>
+              </div>
+              <div className="category-item">
+                <span className="category-label">Product 2 Category:</span>
+                <span className="category-name">{error.category2}</span>
+              </div>
+            </div>
+            <p className="help-text">
+              Please select products from the same category for meaningful comparison.
+            </p>
+          </div>
+        ) : (
+          <p>{error.message}</p>
+        )}
+        <button onClick={handleBackToProducts} className="retry-button">
           Go Back
         </button>
       </div>
@@ -98,7 +142,7 @@ const ComparisonPage = () => {
         <div className="empty-state-icon">📊</div>
         <h3>No Products to Compare</h3>
         <p>Please select products to compare from the product listing page.</p>
-        <button onClick={() => navigate('/products')} className="shop-now-button">
+        <button onClick={handleContinueShopping} className="shop-now-button">
           Browse Products
         </button>
       </div>
@@ -115,9 +159,24 @@ const ComparisonPage = () => {
             <p className="hero-subtitle">
               Compare {comparisonData.products.length} products side by side
             </p>
+            {comparisonData.categoryName && (
+              <div className="category-indicator">
+                <span className="category-label">Category:</span>
+                <span className="category-name">{comparisonData.categoryName}</span>
+              </div>
+            )}
+            {comparisonData.subcategoryName && (
+              <div className="subcategory-indicator">
+                <span className="subcategory-label">Subcategory:</span>
+                <span className="subcategory-name">{comparisonData.subcategoryName}</span>
+                {!comparisonData.sameSubcategory && (
+                  <span className="subcategory-note">(Different subcategories)</span>
+                )}
+              </div>
+            )}
           </div>
           <div className="hero-actions">
-            <button onClick={() => navigate(-1)} className="back-button">
+            <button onClick={handleBackToProducts} className="back-button">
               <span className="back-icon">←</span>
               Back to Products
             </button>
@@ -233,7 +292,7 @@ const ComparisonPage = () => {
           <span className="print-icon">🖨️</span>
           Print Comparison
         </button>
-        <button onClick={() => navigate('/products')} className="continue-shopping-button">
+        <button onClick={handleContinueShopping} className="continue-shopping-button">
           <span className="shop-icon">🛍️</span>
           Continue Shopping
         </button>

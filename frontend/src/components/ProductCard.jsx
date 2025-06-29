@@ -1,39 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../config/config";
+import { useCompare } from "../contexts/CompareContext";
 import RatingStars from "./RatingStars";
 import "../css/ProductCard.css";
 import productImages from "../components/ProductImages";
 
 const ProductCard = ({ product }) => {
-  const [isSelectedForCompare, setIsSelectedForCompare] = useState(false);
+  const { isSelected, addToCompare, removeFromCompare, selectedProducts } = useCompare();
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   
-  // Initialize compare selection from localStorage
-  useEffect(() => {
-    const currentSelections = JSON.parse(localStorage.getItem('compareProducts') || '[]');
-    setIsSelectedForCompare(currentSelections.includes(product.product_id));
-  }, [product.product_id]);
+  const isSelectedForCompare = isSelected(product.product_id);
 
   const toggleCompare = () => {
-    const currentSelections = JSON.parse(localStorage.getItem('compareProducts') || '[]');
-    let updatedSelections;
-
     if (isSelectedForCompare) {
-      // Remove from selection
-      updatedSelections = currentSelections.filter(id => id !== product.product_id);
+      removeFromCompare(product.product_id);
     } else {
-      // Add to selection (limit to 2)
-      if (currentSelections.length >= 2) {
-        alert('You can compare maximum 2 products at a time');
+      // Check if we can add this product to comparison
+      const result = addToCompare(
+        product.product_id, 
+        product.category_id, 
+        product.subcategory_id,
+        product.name,
+        product.subcategory_name
+      );
+      
+      if (result === 'confirm') {
+        // Confirmation dialog will be shown by the context
+        return;
+      } else if (!result) {
+        // The alert is now handled in the context
         return;
       }
-      updatedSelections = [...currentSelections, product.product_id];
     }
-
-    localStorage.setItem('compareProducts', JSON.stringify(updatedSelections));
-    setIsSelectedForCompare(!isSelectedForCompare);
   };
 
   const addToCart = async () => {
@@ -122,6 +122,18 @@ const ProductCard = ({ product }) => {
       
       {/* Product Content */}
       <div className="product-content">
+        {/* Category Badge */}
+        <div className="category-badge">
+          {product.category_name || 'Category'}
+        </div>
+        
+        {/* Subcategory Badge */}
+        {product.subcategory_name && (
+          <div className="subcategory-badge">
+            {product.subcategory_name}
+          </div>
+        )}
+        
         {/* Rating Section */}
         <div className="product-rating">
           <RatingStars rating={product.average_rating} />

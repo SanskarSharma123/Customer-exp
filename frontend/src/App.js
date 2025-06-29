@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { CompareProvider } from "./contexts/CompareContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ProductDetails from "./pages/ProductDetails";
@@ -20,6 +21,7 @@ import DeliveryTracking from "./pages/DeliveryTracking";
 import AdminPanel from "./pages/AdminPanel";
 import Profile from "./pages/Profile";
 import Orders from "./pages/Orders";
+import SubcategoryConfirmDialog from "./components/SubcategoryConfirmDialog";
 import "./css/App.css";
 
 
@@ -81,35 +83,38 @@ function App() {
 
   return (
     <ThemeProvider>
-    <div className="app">
-      <Navbar isLoggedIn={isLoggedIn} user={user} handleLogout={handleLogout} />
-      <main className="main-content">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} setUser={setUser} />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/order-confirmation" element={<OrderConfirmation />} />
-          <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
-          <Route path="/admin" element={<AdminPanel />} />
+      <CompareProvider>
+        <div className="app">
+          <Navbar isLoggedIn={isLoggedIn} user={user} handleLogout={handleLogout} />
+          <main className="main-content">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} setUser={setUser} />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/order-confirmation" element={<OrderConfirmation />} />
+              <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
+              <Route path="/admin" element={<AdminPanel />} />
 
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/products/:productId" element={<ProductDetails />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="*" element={<NotFound />} />
-          <Route path="/products" element={<Products />} />
-  
-          {/* Add this line for comparison */}
-          <Route path="/compare" element={<ComparisonPage />} />
-  
-          <Route path="/cart" element={<Cart />} />
-          {/* ... other routes ... */}
-        </Routes>
-      </main>
-      <Footer />
-    </div>
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/products/:productId" element={<ProductDetails />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="*" element={<NotFound />} />
+              <Route path="/products" element={<Products />} />
+      
+              {/* Add this line for comparison */}
+              <Route path="/compare" element={<ComparisonPage />} />
+      
+              <Route path="/cart" element={<Cart />} />
+              {/* ... other routes ... */}
+            </Routes>
+          </main>
+          <Footer />
+          <SubcategoryConfirmDialog />
+        </div>
+      </CompareProvider>
     </ThemeProvider>
   );
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '../config/config';
 import { useCompare } from '../contexts/CompareContext';
+import SimilarProductsSection from '../components/SimilarProductsSection';
 import '../css/ComparisonPage.css';
 import productImages from "../components/ProductImages";
 
@@ -297,6 +298,16 @@ const ComparisonPage = () => {
           Continue Shopping
         </button>
       </div>
+
+      {/* Similar Products Section */}
+      {comparisonData.products.length > 0 && (
+        <SimilarProductsSection 
+          categoryId={comparisonData.products[0].category_id}
+          subcategoryId={comparisonData.products[0].subcategory_id}
+          product1Id={comparisonData.products[0].product_id}
+          product2Id={comparisonData.products[1] ? comparisonData.products[1].product_id : null}
+        />
+      )}
     </div>
   );
 };

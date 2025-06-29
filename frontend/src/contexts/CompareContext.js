@@ -160,6 +160,22 @@ export const CompareProvider = ({ children }) => {
     }
   };
 
+  const replaceInCompare = (index, productId, categoryId, subcategoryId, productName, subcategoryName) => {
+    if (selectedProducts.length !== 2) return;
+    const updatedProducts = [...selectedProducts];
+    const updatedCategories = [...selectedCategories];
+    const updatedSubcategories = [...selectedSubcategories];
+    updatedProducts[index] = productId;
+    updatedCategories[index] = categoryId;
+    updatedSubcategories[index] = subcategoryId;
+    setSelectedProducts(updatedProducts);
+    setSelectedCategories(updatedCategories);
+    setSelectedSubcategories(updatedSubcategories);
+    localStorage.setItem('compareProducts', JSON.stringify(updatedProducts));
+    localStorage.setItem('compareCategories', JSON.stringify(updatedCategories));
+    localStorage.setItem('compareSubcategories', JSON.stringify(updatedSubcategories));
+  };
+
   const value = {
     selectedProducts,
     selectedCategories,
@@ -170,7 +186,8 @@ export const CompareProvider = ({ children }) => {
     cancelAddToCompare,
     removeFromCompare,
     clearCompare,
-    isSelected
+    isSelected,
+    replaceInCompare
   };
 
   return (

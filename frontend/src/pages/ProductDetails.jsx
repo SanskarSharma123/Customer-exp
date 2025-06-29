@@ -5,7 +5,7 @@ import RatingStars from "../components/RatingStars";
 import ReviewForm from "../components/ReviewForm";
 import "../css/ProductDetails.css";
 import productImages from "../components/ProductImages";
-
+import { useNavigate } from "react-router-dom";
 
 const ProductDetails = () => {
     
@@ -14,6 +14,8 @@ const ProductDetails = () => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const navigate = useNavigate();
+    
 
     // Add price formatting function
     const formatPrice = (price) => {
@@ -95,7 +97,31 @@ const ProductDetails = () => {
     if (loading) return <div className="loading">Loading product...</div>;
     if (error) return <div className="error">{error}</div>;
     if (!product) return <div className="error">Product not found</div>;
-
+    const handleAddToCart = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/cart/items`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: productId,
+            quantity: 1
+          }),
+          credentials: "include",
+        });
+    
+        if (!response.ok) {
+          throw new Error("Failed to add item to cart");
+        }
+    
+        // Navigate to cart page
+        navigate("/cart");
+      } catch (error) {
+        console.error("Error adding to cart:", error);
+        // You can add error handling here if needed
+      }
+    };
     return (
         <div className="product-details">
           <div className="product-main">
@@ -131,7 +157,7 @@ const ProductDetails = () => {
                 <RatingStars rating={product.average_rating} />
                 <span>({product.review_count} reviews)</span>
               </div>
-              <button className="add-to-cart-btn">Add to Cart</button>
+              <button className="add-to-cart-btn" onClick={handleAddToCart}>Add to Cart</button>
             </div>
           </div>
 

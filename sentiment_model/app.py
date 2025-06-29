@@ -155,7 +155,7 @@ class EnhancedRecommendationSystem:
                     JOIN order_items oi ON o.order_id = oi.order_id
                     JOIN products p ON oi.product_id = p.product_id
                     LEFT JOIN categories c ON p.category_id = c.category_id
-                    WHERE o.user_id = %s AND o.status = 'delivered'
+                    WHERE o.user_id = %s
                     ORDER BY o.created_at DESC
                     """
                     cur.execute(query, (user_id,))
@@ -190,7 +190,7 @@ class EnhancedRecommendationSystem:
                     SELECT COUNT(DISTINCT oi.product_id) as unique_products_purchased
                     FROM orders o
                     JOIN order_items oi ON o.order_id = oi.order_id
-                    WHERE o.user_id = %s AND o.status = 'delivered'
+                    WHERE o.user_id = %s
                     """
                     cur.execute(unique_products_query, (user_id,))
                     product_stats = cur.fetchone()
@@ -413,23 +413,21 @@ class EnhancedRecommendationSystem:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
                     SELECT p.product_id, p.name, p.price, p.discount_price, 
-                           p.category_id, p.description, p.image_url, p.unit,
-                           c.name as category_name,
-                           COUNT(oi.order_item_id) as recent_orders,
-                           SUM(oi.quantity) as recent_quantity,
-                           AVG(r.rating) as avg_rating,
-                           COUNT(DISTINCT r.review_id) as review_count
+                        p.category_id, p.description, p.image_url, p.unit,
+                        c.name as category_name,
+                        COALESCE(COUNT(oi.order_item_id), 0) as recent_orders,
+                        COALESCE(SUM(oi.quantity), 0) as recent_quantity,
+                        COALESCE(AVG(r.rating), 0) as avg_rating,
+                        COUNT(DISTINCT r.review_id) as review_count
                     FROM products p
                     LEFT JOIN categories c ON p.category_id = c.category_id
                     LEFT JOIN order_items oi ON p.product_id = oi.product_id
                     LEFT JOIN orders o ON oi.order_id = o.order_id AND 
-                             o.created_at >= NOW() - INTERVAL '%s days' AND
-                             o.status = 'delivered'
+                        o.created_at >= NOW() - INTERVAL '%s days'
                     LEFT JOIN reviews r ON p.product_id = r.product_id
                     WHERE p.stock_quantity > 0
                     GROUP BY p.product_id, p.name, p.price, p.discount_price, 
-                             p.category_id, p.description, p.image_url, p.unit, c.name
-                    HAVING COUNT(oi.order_item_id) > 0
+                            p.category_id, p.description, p.image_url, p.unit, c.name
                     ORDER BY recent_quantity DESC, recent_orders DESC, avg_rating DESC
                     LIMIT %s
                     """
@@ -446,9 +444,9 @@ class EnhancedRecommendationSystem:
          
         if not user_profile or not user_profile['preferences']:
             # Combine trending, best selling, and highest rated
-            trending = self.get_trending_products(limit // 3)
-            best_selling = self.get_best_selling_products(limit // 3)
-            highest_rated = self.get_highest_rated_products(limit // 3)
+            trending = self.get_trending_products(limit)          # Get full limit from each
+            best_selling = self.get_best_selling_products(limit)  # Get full limit from each
+            highest_rated = self.get_highest_rated_products(limit)
             
             # Combine and deduplicate
             seen_ids = set()
@@ -758,7 +756,7 @@ class EnhancedRecommendationSystem:
                     FROM users u
                     WHERE u.user_id != %s
                     AND u.user_id IN (
-                        SELECT user_id FROM orders WHERE status = 'delivered'
+                        SELECT user_id FROM orders
                         UNION
                         SELECT user_id FROM reviews
                     )
@@ -884,7 +882,7 @@ class EnhancedRecommendationSystem:
                         LEFT JOIN categories c ON p.category_id = c.category_id
                         LEFT JOIN reviews r ON p.product_id = r.product_id
                         LEFT JOIN order_items oi ON p.product_id = oi.product_id
-                        LEFT JOIN orders o ON oi.order_id = o.order_id AND o.status = 'delivered'
+                        LEFT JOIN orders o ON oi.order_id = o.order_id
                         WHERE p.category_id IN ({placeholders}) 
                         AND p.stock_quantity > 0
                         """
@@ -933,8 +931,7 @@ class EnhancedRecommendationSystem:
                     LEFT JOIN categories c ON p.category_id = c.category_id
                     LEFT JOIN order_items oi ON p.product_id = oi.product_id
                     LEFT JOIN orders o ON oi.order_id = o.order_id AND 
-                             o.created_at >= NOW() - INTERVAL '%s days' AND
-                             o.status = 'delivered'
+                        o.created_at >= NOW() - INTERVAL '%s days'
                     LEFT JOIN reviews r ON p.product_id = r.product_id
                     WHERE p.stock_quantity > 0
                     GROUP BY p.product_id, p.name, p.price, p.discount_price, 
@@ -999,7 +996,7 @@ class EnhancedRecommendationSystem:
                     LEFT JOIN categories c ON p.category_id = c.category_id
                     LEFT JOIN reviews r ON p.product_id = r.product_id
                     LEFT JOIN order_items oi ON p.product_id = oi.product_id
-                    LEFT JOIN orders o ON oi.order_id = o.order_id AND o.status = 'delivered'
+                    LEFT JOIN orders o ON oi.order_id = o.order_id
                     WHERE p.category_id = %s AND p.stock_quantity > 0
                     """
                     
@@ -1060,26 +1057,24 @@ class EnhancedRecommendationSystem:
                     placeholders = ','.join(['%s'] * len(seasonal_categories))
                     query = f"""
                     SELECT p.product_id, p.name, p.price, p.discount_price, 
-                           p.category_id, p.description, p.image_url, p.unit,
-                           c.name as category_name,
-                           AVG(r.rating) as avg_rating,
-                           COUNT(r.review_id) as review_count,
-                           COUNT(DISTINCT oi.order_id) as seasonal_popularity
+                        p.category_id, p.description, p.image_url, p.unit,
+                        c.name as category_name,
+                        COALESCE(AVG(r.rating), 0) as avg_rating,
+                        COUNT(r.review_id) as review_count,
+                        COALESCE(COUNT(DISTINCT oi.order_id), 0) as seasonal_popularity
                     FROM products p
                     LEFT JOIN categories c ON p.category_id = c.category_id
                     LEFT JOIN reviews r ON p.product_id = r.product_id
                     LEFT JOIN order_items oi ON p.product_id = oi.product_id
-                    LEFT JOIN orders o ON oi.order_id = o.order_id AND 
-                             o.status = 'delivered' AND
-                             EXTRACT(MONTH FROM o.created_at) = %s
+                    LEFT JOIN orders o ON oi.order_id = o.order_id
                     WHERE p.category_id IN ({placeholders}) AND p.stock_quantity > 0
                     GROUP BY p.product_id, p.name, p.price, p.discount_price, 
-                             p.category_id, p.description, p.image_url, p.unit, c.name
+                            p.category_id, p.description, p.image_url, p.unit, c.name
                     ORDER BY seasonal_popularity DESC, avg_rating DESC
                     LIMIT %s
                     """
                     
-                    params = [current_month] + seasonal_categories + [limit]
+                    params = seasonal_categories + [limit]
                     cur.execute(query, params)
                     return cur.fetchall()
                     

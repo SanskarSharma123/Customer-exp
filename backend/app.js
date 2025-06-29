@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
@@ -19,7 +20,7 @@ app.use(cors({
   credentials: true
 }));
 
-
+const SENTIMENT_API_URL = process.env.SENTIMENT_API_URL || "http://localhost:5001";
 // PostgreSQL connection pool
 const pool = new Pool({
   user: process.env.DB_USER || 'sanskar',
@@ -479,34 +480,69 @@ app.delete('/api/cart/items/:itemId', authenticateToken, async (req, res) => {
 // Add review routes
 app.post('/api/products/:productId/reviews', authenticateToken, async (req, res) => {
   try {
-      const productId = req.params.productId;
-      const { rating, comment } = req.body;
+    const productId = req.params.productId;
+    const userId = req.user.userId;
+    const { rating, comment } = req.body;
 
-      // Validate rating
-      if (rating < 1 || rating > 5) {
-          return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    // Validate rating
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+
+    // Check for existing review
+    const existingReview = await pool.query(
+      'SELECT * FROM reviews WHERE product_id = $1 AND user_id = $2',
+      [productId, userId]
+    );
+    
+    if (existingReview.rows.length > 0) {
+      return res.status(400).json({ message: 'You have already reviewed this product' });
+    }
+
+    // Analyze sentiment
+    let sentimentData = { 
+      sentiment_score: null,
+      sentiment_label: null,
+      sentiment_confidence: null
+    };
+    
+    if (comment && comment.trim() !== '') {
+      try {
+        const sentimentResponse = await axios.post(
+          `${SENTIMENT_API_URL}/analyze-sentiment`,
+          { text: comment.trim(), rating },
+          { timeout: 10000 }
+        );
+        
+        if (sentimentResponse.data && sentimentResponse.data.success) {
+          sentimentData = sentimentResponse.data.sentiment;
+        }
+      } catch (error) {
+        console.error('Sentiment analysis error:', error);
       }
+    }
 
-      // Check if user already reviewed this product
-      const existingReview = await pool.query(
-          'SELECT * FROM reviews WHERE product_id = $1 AND user_id = $2',
-          [productId, req.user.userId]
-      );
+    // Insert review with sentiment data
+    const result = await pool.query(
+      `INSERT INTO reviews (
+        product_id, user_id, rating, comment,
+        sentiment_score, sentiment_label, sentiment_confidence
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        productId,
+        userId,
+        rating,
+        comment,
+        sentimentData.sentiment_score,
+        sentimentData.sentiment_label,
+        sentimentData.confidence
+      ]
+    );
 
-      if (existingReview.rows.length > 0) {
-          return res.status(400).json({ message: 'You have already reviewed this product' });
-      }
-
-      // Create new review
-      const result = await pool.query(
-          'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING *',
-          [productId, req.user.userId, rating, comment]
-      );
-
-      res.status(201).json(result.rows[0]);
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-      console.error('Review creation error:', error);
-      res.status(500).json({ message: 'Server error creating review' });
+    console.error('Review creation error:', error);
+    res.status(500).json({ message: 'Server error creating review' });
   }
 });
 
@@ -595,6 +631,301 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
   } catch (error) {
       console.error('Error fetching reviews:', error);
       res.status(500).json({ message: 'Server error fetching reviews' });
+  }
+});
+app.post('/products/:productId/reviews', async (req, res) => {
+  try {
+      // Get user ID from session/auth
+      const userId = req.session?.user_id || req.user?.id;
+      if (!userId) {
+          return res.status(401).json({
+              success: false,
+              message: 'Authentication required'
+          });
+      }
+
+      const { productId } = req.params;
+      const { rating, comment, sentiment_score, sentiment_label, sentiment_confidence } = req.body;
+
+      // Validate input
+      if (!rating || rating < 1 || rating > 5) {
+          return res.status(400).json({
+              success: false,
+              message: 'Valid rating (1-5) is required'
+          });
+      }
+
+      // Check if user has already reviewed this product
+      const existingReviewQuery = `
+          SELECT review_id FROM reviews 
+          WHERE user_id = $1 AND product_id = $2
+      `;
+      
+      const existingReview = await db.query(existingReviewQuery, [userId, productId]);
+      
+      if (existingReview.rows.length > 0) {
+          return res.status(400).json({
+              success: false,
+              message: 'You have already reviewed this product'
+          });
+      }
+
+      // Get or calculate sentiment analysis
+      let sentimentData = {
+          sentiment_score,
+          sentiment_label,
+          confidence: sentiment_confidence
+      };
+
+      // If sentiment data not provided, analyze it using your Python service
+      if (!sentiment_score && comment && comment.trim()) {
+          try {
+              console.log('Analyzing sentiment for comment:', comment);
+              
+              const sentimentResponse = await axios.post(
+                  `${SENTIMENT_API_URL}/analyze-sentiment`,
+                  {
+                      text: comment.trim(),
+                      rating: rating
+                  },
+                  {
+                      timeout: 10000,
+                      headers: {
+                          'Content-Type': 'application/json'
+                      }
+                  }
+              );
+
+              if (sentimentResponse.data && sentimentResponse.data.success) {
+                  const sentiment = sentimentResponse.data.sentiment;
+                  sentimentData = {
+                      sentiment_score: sentiment.sentiment_score,
+                      sentiment_label: sentiment.sentiment_label,
+                      confidence: sentiment.confidence
+                  };
+                  console.log('Sentiment analysis successful:', sentimentData);
+              } else {
+                  console.warn('Sentiment analysis returned no data');
+              }
+              
+          } catch (sentimentError) {
+              console.warn('Sentiment analysis failed:', sentimentError.message);
+              // Continue without sentiment data - not critical for review submission
+              sentimentData = {
+                  sentiment_score: null,
+                  sentiment_label: null,
+                  confidence: null
+              };
+          }
+      }
+      if (!sentimentData.sentiment_score && comment && comment.trim()) {
+        // Simple rating-based sentiment mapping
+        const sentimentMapping = {
+            1: { score: 2.0, label: 'highly negative' },
+            2: { score: 4.0, label: 'negative' },
+            3: { score: 6.0, label: 'neutral' },
+            4: { score: 8.0, label: 'positive' },
+            5: { score: 9.5, label: 'highly positive' }
+        };
+        
+        sentimentData = sentimentMapping[rating] || { 
+            score: 6.0, 
+            label: 'neutral',
+            confidence: 0.7
+        };
+    }
+
+      // Start database transaction
+      const client = await db.connect();
+      
+      try {
+          await client.query('BEGIN');
+
+          // Check if the product exists
+          const productCheck = await client.query(
+              'SELECT product_id FROM products WHERE product_id = $1',
+              [productId]
+          );
+
+          if (productCheck.rows.length === 0) {
+              await client.query('ROLLBACK');
+              return res.status(404).json({
+                  success: false,
+                  message: 'Product not found'
+              });
+          }
+
+          // Insert the review
+          const insertQuery = `
+              INSERT INTO reviews (
+                  product_id, user_id, rating, comment, 
+                  sentiment_score, sentiment_label, sentiment_confidence,
+                  created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+              RETURNING review_id, created_at
+          `;
+
+          const reviewResult = await client.query(insertQuery, [
+              productId,
+              userId,
+              rating,
+              comment || '',
+              sentimentData.sentiment_score,
+              sentimentData.sentiment_label,
+              sentimentData.confidence
+          ]);
+
+          const newReview = reviewResult.rows[0];
+
+          // Get user info for response
+          const userQuery = 'SELECT name FROM users WHERE user_id = $1';
+          const userResult = await client.query(userQuery, [userId]);
+          const userName = userResult.rows[0]?.name || `User ${userId}`;
+
+          await client.query('COMMIT');
+
+          // Prepare response
+          const reviewData = {
+              review_id: newReview.review_id,
+              product_id: parseInt(productId),
+              user_id: userId,
+              user_name: userName,
+              rating: rating,
+              comment: comment || '',
+              created_at: newReview.created_at,
+              sentiment_analysis: sentimentData.sentiment_score ? {
+                  sentiment_score: sentimentData.sentiment_score,
+                  sentiment_label: sentimentData.sentiment_label,
+                  confidence: sentimentData.confidence
+              } : null
+          };
+
+          res.status(201).json({
+              success: true,
+              message: 'Review submitted successfully',
+              review: reviewData
+          });
+
+      } catch (dbError) {
+          await client.query('ROLLBACK');
+          throw dbError;
+      } finally {
+          client.release();
+      }
+
+  } catch (error) {
+      console.error('Error submitting review:', error);
+      res.status(500).json({
+          success: false,
+          message: 'An error occurred while submitting your review'
+      });
+  }
+});
+
+app.post('/analyze-sentiment', async (req, res) => {
+  try {
+      const { text, rating } = req.body;
+
+      if (!text || !text.trim()) {
+          return res.status(400).json({
+              success: false,
+              message: 'Text is required for sentiment analysis'
+          });
+      }
+
+      const sentimentResponse = await axios.post(
+          `${SENTIMENT_API_URL}/analyze-sentiment`,
+          { text: text.trim(), rating },
+          {
+              timeout: 10000,
+              headers: { 'Content-Type': 'application/json' }
+          }
+      );
+
+      if (sentimentResponse.data && sentimentResponse.data.success) {
+          res.json({
+              success: true,
+              sentiment: sentimentResponse.data.sentiment
+          });
+      } else {
+          res.status(500).json({
+              success: false,
+              message: 'Sentiment analysis failed'
+          });
+      }
+
+  } catch (error) {
+      console.error('Sentiment analysis error:', error);
+      res.status(500).json({
+          success: false,
+          message: 'Failed to analyze sentiment'
+      });
+  }
+});
+
+// Route to get reviews for a product (enhanced with sentiment data)
+app.get('/products/:productId/reviews', async (req, res) => {
+  try {
+      const { productId } = req.params;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
+
+      const query = `
+          SELECT 
+              r.review_id, r.product_id, r.user_id, r.rating, r.comment,
+              r.sentiment_score, r.sentiment_label, r.sentiment_confidence,
+              r.created_at, r.updated_at,
+              u.name as user_name
+          FROM reviews r
+          JOIN users u ON r.user_id = u.user_id
+          WHERE r.product_id = $1
+          ORDER BY r.created_at DESC
+          LIMIT $2 OFFSET $3
+      `;
+
+      const reviews = await db.query(query, [productId, limit, offset]);
+
+      // Get total count for pagination
+      const countQuery = 'SELECT COUNT(*) FROM reviews WHERE product_id = $1';
+      const countResult = await db.query(countQuery, [productId]);
+      const totalReviews = parseInt(countResult.rows[0].count);
+
+      // Format reviews with sentiment data
+      const formattedReviews = reviews.rows.map(review => ({
+          review_id: review.review_id,
+          product_id: review.product_id,
+          user_id: review.user_id,
+          user_name: review.user_name,
+          rating: review.rating,
+          comment: review.comment,
+          created_at: review.created_at,
+          updated_at: review.updated_at,
+          sentiment_analysis: review.sentiment_score ? {
+              sentiment_score: review.sentiment_score,
+              sentiment_label: review.sentiment_label,
+              confidence: review.sentiment_confidence
+          } : null
+      }));
+
+      res.json({
+          success: true,
+          reviews: formattedReviews,
+          pagination: {
+              current_page: page,
+              total_pages: Math.ceil(totalReviews / limit),
+              total_reviews: totalReviews,
+              has_next: page < Math.ceil(totalReviews / limit),
+              has_prev: page > 1
+          }
+      });
+
+  } catch (error) {
+      console.error('Error fetching reviews:', error);
+      res.status(500).json({
+          success: false,
+          message: 'Failed to fetch reviews'
+      });
   }
 });
 
@@ -1645,6 +1976,7 @@ app.put('/api/addresses/:addressId', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error updating address' });
   }
 });
+
 // Update delivery location (for delivery personnel app)
 app.post('/api/orders/:orderId/location', authenticateToken, async (req, res) => {
   try {

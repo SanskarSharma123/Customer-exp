@@ -57,7 +57,23 @@ const Cart = () => {
     };
 
     fetchData();
-  }, []);
+
+    // Add event listeners for cart updates
+    const handleCartUpdate = (e) => {
+      if (e.key === "cart_updated" || e.type === "cart_updated_manual") {
+        fetchData();
+      }
+    };
+
+    window.addEventListener("storage", handleCartUpdate);
+    window.addEventListener("cart_updated_manual", handleCartUpdate);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener("storage", handleCartUpdate);
+      window.removeEventListener("cart_updated_manual", handleCartUpdate);
+    };
+}, []);
 
   // Auto-hide notifications
   useEffect(() => {

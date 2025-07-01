@@ -1,0 +1,152 @@
+.not-found-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 100px);
+    padding: 20px;
+    text-align: center;
+  }
+  
+  .not-found-content {
+    max-width: 500px;
+    width: 100%;
+  }
+  
+  .not-found-content h1 {
+    font-size: 100px;
+    margin: 0;
+    color: #4CAF50;
+  }
+  
+  .not-found-content h2 {
+    font-size: 28px;
+    margin: 10px 0;
+    color: #333;
+  }
+  
+  .not-found-content p {
+    color: #666;
+    margin-bottom: 30px;
+  }
+  
+  .home-link {
+    display: inline-block;
+    padding: 12px 25px;
+    background-color: #4CAF50;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 16px;
+    transition: background-color 0.3s;
+  }
+  
+  .home-link:hover {
+    background-color: #45a049;
+  }
+
+  /* Dark mode styles */
+.dark-mode .admin-container,
+.dark-mode .cart-container,
+.dark-mode .dashboard-container,
+.dark-mode .tracking-container,
+.dark-mode .orders-container,
+.dark-mode .profile-container,
+.dark-mode .products-container {
+  background-color: var(--bg-color);
+}
+
+.dark-mode .admin-sidebar {
+  background-color: #2a2a2a;
+}
+
+.dark-mode .products-admin,
+.dark-mode .orders-admin,
+.dark-mode .users-admin,
+.dark-mode .cart-item,
+.dark-mode .delivery-address,
+.dark-mode .payment-method,
+.dark-mode .order-summary,
+.dark-mode .order-card,
+.dark-mode .user-info,
+.dark-mode .addresses-section,
+.dark-mode .product-card,
+.dark-mode .auth-card,
+.dark-mode .confirmation-card,
+.dark-mode .not-found-content,
+.dark-mode .address-form-container {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode h4,
+.dark-mode .item-details h3,
+.dark-mode .delivery-address h3,
+.dark-mode .payment-method h3,
+.dark-mode .order-summary h3,
+.dark-mode .product-info h3,
+.dark-mode .order-header h3,
+.dark-mode .info-item span {
+  color: var(--text-color);
+}
+
+.dark-mode .item-details p,
+.dark-mode .address-card p,
+.dark-mode .summary-row,
+.dark-mode .order-date,
+.dark-mode .product-unit,
+.dark-mode .no-orders,
+.dark-mode .no-products,
+.dark-mode .no-addresses {
+  color: #b0b0b0;
+}
+
+.dark-mode .address-card {
+  border-color: var(--border-color);
+}
+
+.dark-mode .add-address {
+  background-color: #2a2a2a;
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.dark-mode .place-order,
+.dark-mode .add-to-cart,
+.dark-mode .auth-button,
+.dark-mode .home-link,
+.dark-mode .track-order,
+.dark-mode .shop-now-button {
+  background-color: var(--primary-color);
+}
+
+.dark-mode .continue-shopping {
+  background-color: var(--card-bg);
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.dark-mode .status-timeline::before {
+  background-color: #444;
+}
+
+.dark-mode .step-icon {
+  background-color: #444;
+  color: #fff;
+}
+
+.dark-mode .status-step.active .step-icon {
+  background-color: var(--primary-color);
+}
+
+.dark-mode .update-item {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+.dark-mode .loading {
+  color: #b0b0b0;
+}

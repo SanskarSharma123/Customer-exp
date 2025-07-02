@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect} from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../config/config";
 import "../css/AdminPanel.css";
@@ -15,6 +15,7 @@ const AdminPanel = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [personnel, setPersonnel] = useState([]);
   const [reviews, setReviews] = useState([]);
+  
   
   const [newPersonnel, setNewPersonnel] = useState({
     name: '',
@@ -34,7 +35,9 @@ const AdminPanel = () => {
     is_featured: false
   });
   const navigate = useNavigate();
-
+const [productQuery, setProductQuery] = useState('');
+const [generating, setGenerating] = useState(false);
+const [suggestions, setSuggestions] = useState(null);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -99,6 +102,146 @@ const AdminPanel = () => {
       setNewProduct(prev => ({ ...prev, [name]: val }));
     }
   };
+  
+
+// Remove handleImageUpload and analyzeImage functions
+
+// Add these functions instead:
+// Replace your existing generateProductSuggestions function with this improved version
+const generateProductSuggestions = async () => {
+  if (!productQuery.trim()) {
+    setError('Please enter a product name');
+    return;
+  }
+  
+  setGenerating(true);
+  setError(''); // Clear previous errors
+  
+  try {
+    console.log('Generating suggestions for:', productQuery.trim());
+    
+    const response = await fetch(`${apiUrl}/admin/generate-product-suggestions`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ productName: productQuery.trim() }),
+      credentials: 'include'
+    });
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', response.headers);
+    
+    // Check if response is actually JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Response is not JSON, content-type:', contentType);
+      
+      // Try to get the actual response text to see what we received
+      const responseText = await response.text();
+      console.error('Actual response:', responseText.substring(0, 200) + '...');
+      
+      throw new Error('Server returned non-JSON response. This might be a server error.');
+    }
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || `Server error: ${response.status}`);
+    }
+    
+    // Validate the response data more thoroughly
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid response format received');
+    }
+    
+    if (!data.name || !data.description || !data.category) {
+      console.error('Incomplete suggestion data:', data);
+      throw new Error('Incomplete suggestion data received from server');
+    }
+    
+    // Ensure all required fields are present with defaults
+    const validatedData = {
+      name: data.name || productQuery.trim(),
+      description: data.description || `Quality ${productQuery.trim()} product`,
+      price: parseFloat(data.price) || 100,
+      category: data.category || 'General',
+      unit: data.unit || 'pieces',
+      stock_quantity: parseInt(data.stock_quantity) || 10,
+      image_url: data.image_url || ''
+    };
+    
+    setSuggestions(validatedData);
+    console.log('Successfully generated suggestions:', validatedData);
+    
+  } catch (error) {
+    console.error('Product suggestion error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // More specific error messages
+    let userMessage = 'Failed to generate product suggestions. ';
+    
+    if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+      userMessage += 'Please check your internet connection and try again.';
+    } else if (error.message.includes('non-JSON response') || error.message.includes('<!DOCTYPE')) {
+      userMessage += 'Server error detected. Please try again in a few moments.';
+    } else if (error.message.includes('authentication') || error.message.includes('401')) {
+      userMessage += 'Authentication failed. Please refresh the page and try again.';
+    } else if (error.message.includes('Server error: 500')) {
+      userMessage += 'Internal server error. Please try again later.';
+    } else if (error.message.includes('timeout')) {
+      userMessage += 'Request timed out. Please try again.';
+    } else {
+      userMessage += error.message || 'Please try again.';
+    }
+    
+    setError(userMessage);
+    
+    // Also show alert for immediate user feedback
+    alert(`❌ ${userMessage}`);
+    
+  } finally {
+    setGenerating(false);
+  }
+};
+
+const applySuggestions = () => {
+  if (!suggestions) return;
+  
+  // Find category ID by name
+  const categoryMatch = categories.find(cat => 
+    cat.name.toLowerCase().includes(suggestions.category.toLowerCase()) ||
+    suggestions.category.toLowerCase().includes(cat.name.toLowerCase())
+  );
+  
+  const suggestionData = {
+    name: suggestions.name || '',
+    description: suggestions.description || '',
+    price: suggestions.price || 0,
+    category_id: categoryMatch?.category_id || '',
+    stock_quantity: suggestions.stock_quantity || 10,
+    unit: suggestions.unit || 'pieces',
+    image_url: suggestions.image_url || '',
+    discount_price: 0,
+    is_featured: false
+  };
+  
+  if (editingProduct) {
+    setEditingProduct(prev => ({ ...prev, ...suggestionData }));
+  } else {
+    setNewProduct(prev => ({ ...prev, ...suggestionData }));
+  }
+  
+  // Clear suggestions
+  setSuggestions(null);
+  setProductQuery('');
+  
+  alert('✅ AI suggestions applied! Please review and adjust as needed.');
+};
 
   const handleAddProduct = async () => {
     try {
@@ -378,6 +521,88 @@ const AdminPanel = () => {
             
             <div className="product-form">
               <h3>{editingProduct ? '✏️ Edit Product' : '➕ Add New Product'}</h3>
+              {/* AI-Powered Product Creation */}
+<div className="ai-product-section" style={{ 
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  padding: '20px',
+  borderRadius: '12px',
+  marginBottom: '20px',
+  color: 'white'
+}}>
+  <h4>🤖 AI Product Suggestions</h4>
+  <p>Type a product name and get AI-powered suggestions for details!</p>
+  
+  <div className="product-suggestion-container">
+    <div className="input-group" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+      <input
+        type="text"
+        placeholder="Enter product name (e.g., 'Organic Apples', 'Wireless Headphones')"
+        value={productQuery}
+        onChange={(e) => setProductQuery(e.target.value)}
+        style={{
+          flex: 1,
+          padding: '12px',
+          border: 'none',
+          borderRadius: '8px',
+          fontSize: '14px'
+        }}
+      />
+      <button 
+        onClick={generateProductSuggestions}
+        disabled={!productQuery.trim() || generating}
+        className="suggest-btn"
+        style={{
+          padding: '12px 20px',
+          background: 'rgba(255,255,255,0.2)',
+          border: 'none',
+          borderRadius: '8px',
+          color: 'white',
+          cursor: 'pointer',
+          fontWeight: '600'
+        }}
+      >
+        {generating ? '🤖 Generating...' : '✨ Get Suggestions'}
+      </button>
+    </div>
+    
+    {generating && (
+      <div className="generating" style={{ textAlign: 'center', padding: '10px' }}>
+        🤖 AI is generating product suggestions...
+      </div>
+    )}
+    
+    {suggestions && (
+      <div className="suggestions-preview" style={{
+        background: 'rgba(255,255,255,0.1)',
+        padding: '15px',
+        borderRadius: '8px',
+        marginTop: '10px'
+      }}>
+        <h5>✨ AI Suggestions Preview:</h5>
+        <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+          <strong>Name:</strong> {suggestions.name}<br/>
+          <strong>Category:</strong> {suggestions.category}<br/>
+          <strong>Price:</strong> ₹{suggestions.price}<br/>
+          <strong>Description:</strong> {suggestions.description?.substring(0, 100)}...
+        </div>
+        <button 
+          onClick={applySuggestions}
+          style={{
+            marginTop: '10px',
+            padding: '8px 16px',
+            background: 'var(--success-color)',
+            border: 'none',
+            borderRadius: '6px',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          ✅ Apply Suggestions
+        </button>
+      </div>
+    )}
+  </div>
+</div>
               
               <div className="form-row">
                 <div>

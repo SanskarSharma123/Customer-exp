@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const Groq = require('groq-sdk');
 require('dotenv').config();
 
 
@@ -1635,7 +1636,206 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
     res.status(500).json(errorResponse);
   }
 });
+// Add this route to your admin routes
+app.post('/api/admin/generate-product-suggestions', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { productName } = req.body;
+    
+    console.log('Received product suggestion request for:', productName);
+    
+    if (!productName || !productName.trim()) {
+      return res.status(400).json({ message: 'Product name is required' });
+    }
 
+    // Make sure to set this in your .env file
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    
+    if (!GROQ_API_KEY) {
+      console.error('GROQ_API_KEY not found in environment variables');
+      return res.status(500).json({ 
+        message: 'AI service configuration error - API key missing'
+      });
+    }
+
+    // Import Groq SDK
+    let Groq;
+    try {
+      Groq = require('groq-sdk');
+    } catch (importError) {
+      console.error('Groq SDK import error:', importError);
+      return res.status(500).json({ 
+        message: 'AI service dependency missing. Please install groq-sdk'
+      });
+    }
+
+    const groq = new Groq({
+      apiKey: GROQ_API_KEY
+    });
+
+    const prompt = `You are a product catalog expert for an Indian e-commerce store. Given a product name, provide realistic product details.
+
+Product name: "${productName.trim()}"
+
+Please respond with ONLY a valid JSON object containing exactly these fields:
+{
+  "name": "improved/formatted product name",
+  "description": "detailed product description (2-3 sentences)",
+  "price": 25000,
+  "category": "Electronics",
+  "unit": "pieces",
+  "stock_quantity": 10,
+  "image_url": ""
+}
+
+Categories to choose from: Electronics, Fruits & Vegetables, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Snacks & Confectionery, Personal Care, Household Items, Books & Stationery, Sports & Fitness
+
+Important: 
+- Price should be in Indian Rupees (number only, no currency symbol)
+- Respond with ONLY the JSON object, no additional text or formatting
+- Do not wrap in markdown code blocks`;
+
+    console.log('Sending request to Groq API...');
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      // Updated model - choose one of these based on your needs:
+      model: "llama-3.3-70b-versatile", // Best for complex tasks
+      // model: "llama-3.1-8b-instant",   // Faster, good for simpler tasks
+      // model: "llama3-70b-8192",        // Good balance
+      // model: "llama3-8b-8192",         // Fastest
+      temperature: 0.3,
+      max_tokens: 500,
+      top_p: 1,
+      stream: false
+    });
+
+    const responseText = completion.choices[0]?.message?.content;
+    
+    console.log('Raw AI response:', responseText);
+    
+    if (!responseText) {
+      throw new Error('No response content from AI service');
+    }
+
+    // Clean the response text more thoroughly
+    let cleanedResponse = responseText.trim();
+    
+    // Remove any potential markdown formatting
+    cleanedResponse = cleanedResponse
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/gi, '')
+      .replace(/^json\s*/gi, '')
+      .trim();
+
+    // Find JSON object boundaries
+    const jsonStart = cleanedResponse.indexOf('{');
+    const jsonEnd = cleanedResponse.lastIndexOf('}');
+    
+    if (jsonStart === -1 || jsonEnd === -1) {
+      throw new Error('No valid JSON object found in AI response');
+    }
+    
+    cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd + 1);
+    
+    console.log('Cleaned response:', cleanedResponse);
+
+    // Parse the JSON response
+    let suggestions;
+    try {
+      suggestions = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Attempted to parse:', cleanedResponse);
+      
+      // Fallback: create a basic suggestion
+      suggestions = {
+        name: productName.trim(),
+        description: `High-quality ${productName.trim()} with excellent features and reliability.`,
+        price: 1000,
+        category: "Electronics",
+        unit: "pieces",
+        stock_quantity: 10,
+        image_url: ""
+      };
+      
+      console.log('Using fallback suggestion due to parse error');
+    }
+
+    // Validate and sanitize the response
+    const requiredFields = ['name', 'description', 'price', 'category', 'unit', 'stock_quantity'];
+    const missingFields = requiredFields.filter(field => !suggestions.hasOwnProperty(field));
+    
+    if (missingFields.length > 0) {
+      console.log('Missing fields detected:', missingFields);
+      // Fill in missing fields with defaults
+      if (!suggestions.name) suggestions.name = productName.trim();
+      if (!suggestions.description) suggestions.description = `Quality ${productName.trim()} product`;
+      if (!suggestions.price) suggestions.price = 100;
+      if (!suggestions.category) suggestions.category = "General";
+      if (!suggestions.unit) suggestions.unit = "pieces";
+      if (!suggestions.stock_quantity) suggestions.stock_quantity = 10;
+    }
+
+    // Ensure correct data types
+    suggestions.price = parseFloat(suggestions.price) || 100;
+    suggestions.stock_quantity = parseInt(suggestions.stock_quantity) || 10;
+    suggestions.image_url = suggestions.image_url || "";
+
+    // Validate price is reasonable
+    if (suggestions.price < 1 || suggestions.price > 1000000) {
+      suggestions.price = 100; // Default fallback price
+    }
+
+    // Validate stock quantity is reasonable
+    if (suggestions.stock_quantity < 1 || suggestions.stock_quantity > 1000) {
+      suggestions.stock_quantity = 10; // Default fallback stock
+    }
+
+    console.log('Final suggestions:', suggestions);
+    console.log('Successfully generated suggestions for:', productName);
+    
+    res.json(suggestions);
+
+  } catch (error) {
+    console.error('Product suggestion error:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more specific error messages based on error type
+    let errorMessage = 'Failed to generate product suggestions';
+    let statusCode = 500;
+    
+    if (error.message.includes('API key') || error.message.includes('authentication')) {
+      errorMessage = 'AI service authentication failed';
+      statusCode = 500;
+    } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+      errorMessage = 'AI service returned invalid data format';
+      statusCode = 500;
+    } else if (error.message.includes('No response') || error.message.includes('timeout')) {
+      errorMessage = 'AI service is not responding';
+      statusCode = 503;
+    } else if (error.message.includes('network') || error.message.includes('ENOTFOUND')) {
+      errorMessage = 'Network error connecting to AI service';
+      statusCode = 503;
+    } else if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Unable to connect to AI service';
+      statusCode = 503;
+    } else if (error.message.includes('model') && error.message.includes('decommissioned')) {
+      errorMessage = 'AI model is no longer supported. Please update the application.';
+      statusCode = 500;
+    }
+    
+    res.status(statusCode).json({ 
+      message: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 // Admin: Update product
 // Update product route
 app.put('/api/admin/products/:productId', authenticateToken, isAdmin, async (req, res) => {

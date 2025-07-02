@@ -4,6 +4,8 @@ import axios from 'axios';
 import { apiUrl } from '../config/config';
 import '../css/ComparisonPage.css';
 import productImages from "../components/ProductImages";
+import ProductCard from '../components/ProductCard';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const ComparisonPage = () => {
   const [comparisonData, setComparisonData] = useState(null);
@@ -12,6 +14,11 @@ const ComparisonPage = () => {
   const [highlightDifferences, setHighlightDifferences] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [replacing, setReplacing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingReplace, setPendingReplace] = useState(null); // {replaceIdx, newProduct}
+  const [confirmMessage, setConfirmMessage] = useState('');
 
   useEffect(() => {
     const fetchComparisonData = async () => {
@@ -34,6 +41,23 @@ const ComparisonPage = () => {
 
     fetchComparisonData();
   }, [location.search]);
+
+  // Fetch similar products after comparison data loads
+  useEffect(() => {
+    if (!comparisonData || !comparisonData.products) return;
+    const subcategoryIds = comparisonData.products.map(p => p.subcategory_id).filter(Boolean);
+    const excludeIds = comparisonData.products.map(p => p.product_id);
+    // Use the category_id of the compared products (assume both have the same category)
+    const categoryId = comparisonData.products[0]?.category_id;
+    if (subcategoryIds.length === 0 || !categoryId) return;
+    axios.post(`${apiUrl}/products/similar-in-subcategories`, {
+      subcategory_ids: subcategoryIds,
+      exclude_product_ids: excludeIds,
+      category_id: categoryId
+    })
+      .then(res => setSimilarProducts(res.data))
+      .catch(() => setSimilarProducts([]));
+  }, [comparisonData]);
 
   // Helper function to get product image
   const getProductImage = (product) => {
@@ -69,6 +93,62 @@ const ComparisonPage = () => {
     
     return null;
   };
+
+  // Helper to check if subcategory is different (compare newProduct with the other product)
+  const isDifferentSubcategory = (replaceIdx, newProduct) => {
+    if (!comparisonData || !comparisonData.products) return false;
+    const otherIdx = replaceIdx === 0 ? 1 : 0;
+    const otherProduct = comparisonData.products[otherIdx];
+    return otherProduct.subcategory_id !== newProduct.subcategory_id;
+  };
+
+  // Replacement logic with subcategory check
+  const handleReplace = (replaceIdx, newProduct) => {
+    if (!comparisonData || !comparisonData.products) return;
+    // Check subcategory difference
+    if (isDifferentSubcategory(replaceIdx, newProduct)) {
+      setPendingReplace({ replaceIdx, newProduct });
+      setConfirmMessage('These products are from different subcategories. Do you still want to compare them?');
+      setConfirmOpen(true);
+      return;
+    }
+    doReplace(replaceIdx, newProduct);
+  };
+
+  const doReplace = (replaceIdx, newProduct) => {
+    setReplacing(true);
+    // Always replace the product at replaceIdx (0 or 1)
+    const newProducts = [...comparisonData.products];
+    newProducts[replaceIdx] = newProduct;
+    const newIds = newProducts.map(p => p.product_id);
+    localStorage.setItem('compareProducts', JSON.stringify(newIds));
+    localStorage.setItem('compareCategory', String(newProduct.category_id));
+    localStorage.setItem('compareSubcategory', String(newProduct.subcategory_id));
+    navigate(`/compare?ids=${newIds.join(',')}`);
+    setReplacing(false);
+  };
+
+  const handleConfirm = () => {
+    if (pendingReplace) {
+      doReplace(pendingReplace.replaceIdx, pendingReplace.newProduct);
+      setPendingReplace(null);
+      setConfirmOpen(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setPendingReplace(null);
+    setConfirmOpen(false);
+  };
+
+  // Clear comparison selection when navigating back or on unmount
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem('compareProducts');
+      localStorage.removeItem('compareCategory');
+      window.dispatchEvent(new Event('compareProductsChanged'));
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -117,7 +197,12 @@ const ComparisonPage = () => {
             </p>
           </div>
           <div className="hero-actions">
-            <button onClick={() => navigate(-1)} className="back-button">
+            <button onClick={() => {
+              localStorage.removeItem('compareProducts');
+              localStorage.removeItem('compareCategory');
+              window.dispatchEvent(new Event('compareProductsChanged'));
+              navigate('/products');
+            }} className="back-button">
               <span className="back-icon">←</span>
               Back to Products
             </button>
@@ -227,6 +312,36 @@ const ComparisonPage = () => {
         </div>
       </div>
 
+      {/* Similar Products Section */}
+      {similarProducts.length > 0 && (
+        <div className="similar-products-section">
+          <h2 className="similar-title">Similar products that you might like</h2>
+          <div className="similar-products-list">
+            {similarProducts.map((product, idx) => (
+              <div key={product.product_id || idx} className="similar-product-card">
+                <ProductCard product={product} />
+                <div className="replace-actions">
+                  <button
+                    className="replace-btn"
+                    disabled={replacing}
+                    onClick={() => handleReplace(0, product)}
+                  >
+                    Replace Product 1
+                  </button>
+                  <button
+                    className="replace-btn"
+                    disabled={replacing}
+                    onClick={() => handleReplace(1, product)}
+                  >
+                    Replace Product 2
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bottom Actions */}
       <div className="comparison-actions">
         <button onClick={() => window.print()} className="print-button">
@@ -238,6 +353,14 @@ const ComparisonPage = () => {
           Continue Shopping
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Compare products from different subcategories?"
+        message={confirmMessage}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 };

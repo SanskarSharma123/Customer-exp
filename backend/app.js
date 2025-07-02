@@ -24,10 +24,10 @@ app.use(cors({
 const SENTIMENT_API_URL = process.env.SENTIMENT_API_URL || "http://localhost:5001";
 // PostgreSQL connection pool
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
+  user: process.env.DB_USER || 'vidya',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'postgres2',
-  password: process.env.DB_PASSWORD || 'hatebitches1',
+  database: process.env.DB_NAME || 'commerce_database',
+  password: process.env.DB_PASSWORD || 'commerceproject',
   port: process.env.DB_PORT || 5432,
 });
 
@@ -616,7 +616,8 @@ app.get('/api/products/compare', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        p.subcategory_id, p.category_id
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
       WHERE p.product_id = ANY($1)
@@ -640,28 +641,28 @@ app.get('/api/products/compare', async (req, res) => {
   }
 });
 
-// Helper function (add with other utility functions)
-function getCommonAttributes(product1, product2) {
-  const attributes = [];
-  const keys = new Set([...Object.keys(product1), ...Object.keys(product2)]);
-  
-  // Exclude fields that shouldn't be compared
-  const excludedFields = new Set([
-    'product_id', 'image_url', 'created_at', 
-    'updated_at', 'average_rating', 'review_count'
-  ]);
-
-  for (const key of keys) {
-    if (!excludedFields.has(key) && product1[key] !== undefined && product2[key] !== undefined) {
-      attributes.push({
-        name: key.replace(/_/g, ' '), // Convert snake_case to readable
-        values: [product1[key], product2[key]]
-      });
+// New endpoint: Get similar products from the subcategories of compared products
+app.post('/api/products/similar-in-subcategories', async (req, res) => {
+  try {
+    const { subcategory_ids, exclude_product_ids, category_id } = req.body;
+    if (!Array.isArray(subcategory_ids) || subcategory_ids.length === 0) {
+      return res.status(400).json({ message: 'subcategory_ids array is required' });
     }
+    if (!category_id) {
+      return res.status(400).json({ message: 'category_id is required' });
+    }
+    // Exclude compared products from the results
+    const excludeIds = Array.isArray(exclude_product_ids) ? exclude_product_ids : [];
+    const products = await pool.query(
+      `SELECT * FROM products WHERE category_id = $1 AND subcategory_id = ANY($2) AND product_id != ALL($3) LIMIT 12`,
+      [category_id, subcategory_ids, excludeIds.length ? excludeIds : [0]]
+    );
+    res.json(products.rows);
+  } catch (error) {
+    console.error('Error fetching similar products:', error);
+    res.status(500).json({ message: 'Server error fetching similar products' });
   }
-
-  return attributes;
-}
+});
 
 // Get product reviews
 app.get('/api/products/:productId/reviews', async (req, res) => {
@@ -2340,4 +2341,24 @@ app.listen(PORT, () => {
 
 
 module.exports = app;
+
+// Helper function for product comparison attributes
+function getCommonAttributes(product1, product2) {
+  const attributes = [];
+  const keys = new Set([...Object.keys(product1), ...Object.keys(product2)]);
+  // Exclude fields that shouldn't be compared
+  const excludedFields = new Set([
+    'product_id', 'image_url', 'created_at', 'updated_at',
+    'average_rating', 'review_count', 'subcategory_id', 'category_id'
+  ]);
+  for (const key of keys) {
+    if (!excludedFields.has(key) && product1[key] !== undefined && product2[key] !== undefined) {
+      attributes.push({
+        name: key.replace(/_/g, ' '), // Convert snake_case to readable
+        values: [product1[key], product2[key]]
+      });
+    }
+  }
+  return attributes;
+}
 

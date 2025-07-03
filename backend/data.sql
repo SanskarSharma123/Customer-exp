@@ -72,10 +72,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Mosambi (Sweet Lime)', 'Juicy sweet lime fruits', 80.00, 75.00, 1, '/images/products/mosambi.jpg', 80, 'kg', FALSE),
 ('Avocado', 'Imported Hass avocados', 320.00, 300.00, 1, '/images/products/avocado.jpg', 30, 'piece', TRUE),
 ('Watermelon', 'Sweet and juicy watermelon', 120.00, 100.00, 1, '/images/products/watermelon.jpg', 40, 'piece', FALSE),
-('Pomegranate', 'Fresh red pomegranates', 180.00, 160.00, 1, '/images/products/pomegranate.jpg', 60, 'kg', TRUE);
+('Pomegranate', 'Fresh red pomegranates', 180.00, 160.00, 1, '/images/products/pomegranate.jpg', 60, 'kg', TRUE),
 
 -- Insert detailed products - Dairy & Eggs
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Amul Full Cream Milk', 'Fresh whole milk from Amul', 70.00, 65.00, 2, '/images/products/amul-milk.jpg', 80, 'liter', TRUE),
 ('Farm Fresh Brown Eggs', 'Farm fresh brown eggs', 90.00, 80.00, 2, '/images/products/brown-eggs.jpg', 100, 'dozen', FALSE),
 ('Amul Butter', 'Unsalted Amul butter', 55.00, 50.00, 2, '/images/products/amul-butter.jpg', 60, '500g', FALSE),
@@ -105,10 +104,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Amul Pro Protein Drink', 'High protein flavored milk', 45.00, 40.00, 2, '/images/products/amul-pro.jpg', 60, '200ml', TRUE),
 ('Amul Lactose-Free Milk', 'Lactose-free milk', 85.00, 80.00, 2, '/images/products/lactose-free.jpg', 40, '1L', FALSE),
 ('Mother Dairy Low Fat Dahi', 'Low fat yogurt', 50.00, 45.00, 2, '/images/products/low-fat-dahi.jpg', 60, '400g', FALSE),
-('Amul Mithai Mate', 'Condensed milk', 65.00, 60.00, 2, '/images/products/mithai-mate.jpg', 50, '400g', TRUE);
+('Amul Mithai Mate', 'Condensed milk', 65.00, 60.00, 2, '/images/products/mithai-mate.jpg', 50, '400g', TRUE),
 
 -- Insert detailed products - Bakery
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Britannia Whole Wheat Bread', 'Freshly baked whole wheat bread', 45.00, 40.00, 3, '/images/products/britannia-bread.jpg', 50, 'loaf', TRUE),
 ('Britannia Croissants - Butter', 'Buttery croissants', 120.00, 110.00, 3, '/images/products/britannia-croissants.jpg', 40, 'pack of 6', FALSE),
 ('Parle Hide & Seek Cookies', 'Chocolate chip cookies', 80.00, 75.00, 3, '/images/products/hide-seek.jpg', 60, 'pack', TRUE),
@@ -138,10 +136,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Cookies - Oatmeal Raisin', 'Healthy oatmeal raisin cookies', 120.00, 110.00, 3, '/images/products/oatmeal-cookies.jpg', 30, 'pack', FALSE),
 ('Brioche Bread', 'Rich buttery brioche bread', 90.00, 85.00, 3, '/images/products/brioche.jpg', 30, 'loaf', TRUE),
 ('Focaccia Bread', 'Italian herb focaccia', 120.00, 110.00, 3, '/images/products/focaccia.jpg', 25, 'piece', FALSE),
-('Sourdough Bread', 'Artisanal sourdough bread', 150.00, 140.00, 3, '/images/products/sourdough.jpg', 20, 'loaf', TRUE);
+('Sourdough Bread', 'Artisanal sourdough bread', 150.00, 140.00, 3, '/images/products/sourdough.jpg', 20, 'loaf', TRUE),
 
 -- Insert detailed products - Snacks & Beverages
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Lays Classic Salted', 'Classic salted potato chips', 50.00, 45.00, 4, '/images/products/lays-classic.jpg', 100, '165g', TRUE),
 ('Coca-Cola', 'Refreshing cola drink', 60.00, 55.00, 4, '/images/products/coca-cola.jpg', 120, '2L', FALSE),
 ('Haldirams Mixed Nuts', 'Assortment of premium nuts', 220.00, 200.00, 4, '/images/products/haldirams-nuts.jpg', 50, '500g', TRUE),
@@ -171,10 +168,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Frooti', 'Mango drink', 20.00, 18.00, 4, '/images/products/frooti.jpg', 120, '250ml', FALSE),
 ('Lays American Style Cream & Onion', 'Creamy onion flavored chips', 50.00, 48.00, 4, '/images/products/lays-cream-onion.jpg', 100, '165g', TRUE),
 ('Haldirams Moong Dal', 'Spicy moong dal snack', 45.00, 42.00, 4, '/images/products/moong-dal.jpg', 80, '200g', FALSE),
-('Cadbury Gems', 'Colorful chocolate buttons', 20.00, 18.00, 4, '/images/products/gems.jpg', 120, '45g', TRUE);
+('Cadbury Gems', 'Colorful chocolate buttons', 20.00, 18.00, 4, '/images/products/gems.jpg', 120, '45g', TRUE),
 
 -- Insert detailed products - Household
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Vim Dishwashing Liquid', 'Antibacterial dish cleaning liquid', 120.00, 110.00, 5, '/images/products/vim-liquid.jpg', 70, 'bottle', FALSE),
 ('Origami Toilet Paper', 'Soft toilet paper rolls', 180.00, 160.00, 5, '/images/products/origami-toilet.jpg', 90, 'pack of 6', TRUE),
 ('Surf Excel Liquid Detergent', 'High-efficiency laundry detergent', 250.00, 230.00, 5, '/images/products/surf-excel.jpg', 60, '2L', FALSE),
@@ -204,10 +200,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Genteel Liquid Handwash', 'Moisturizing hand wash', 75.00, 70.00, 5, '/images/products/genteel.jpg', 60, '250ml', FALSE),
 ('Dettol Antiseptic Liquid', 'First aid antiseptic', 120.00, 110.00, 5, '/images/products/dettol-liquid.jpg', 70, '250ml', TRUE),
 ('Henko Detergent Powder', 'Premium laundry detergent', 250.00, 240.00, 5, '/images/products/henko.jpg', 40, '2kg', FALSE),
-('Maxo Mosquito Repellent', 'Coil mosquito repellent', 35.00, 32.00, 5, '/images/products/maxo.jpg', 100, 'pack of 10', FALSE);
+('Maxo Mosquito Repellent', 'Coil mosquito repellent', 35.00, 32.00, 5, '/images/products/maxo.jpg', 100, 'pack of 10', FALSE),
 
 -- Insert detailed products - Meat & Seafood (new category)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Fresh Chicken Breast', 'Boneless chicken breast', 280.00, 260.00, 6, '/images/products/chicken-breast.jpg', 50, '500g', TRUE),
 ('Atlantic Salmon Fillet', 'Fresh salmon fillet', 550.00, 520.00, 6, '/images/products/salmon.jpg', 30, '500g', TRUE),
 ('Mutton Curry Cut', 'Fresh goat meat curry pieces', 650.00, 620.00, 6, '/images/products/mutton.jpg', 40, 'kg', FALSE),
@@ -237,10 +232,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Beef Chuck', 'Fresh beef chuck pieces', 550.00, 520.00, 6, '/images/products/beef-chuck.jpg', 25, '500g', TRUE),
 ('Fresh Clams', 'Live clams', 280.00, 260.00, 6, '/images/products/clams.jpg', 30, '500g', FALSE),
 ('Chicken Gizzard', 'Fresh chicken gizzards', 120.00, 110.00, 6, '/images/products/gizzard.jpg', 40, '250g', FALSE),
-('Norwegian Salmon', 'Premium imported salmon', 850.00, 800.00, 6, '/images/products/norwegian-salmon.jpg', 20, '500g', TRUE);
+('Norwegian Salmon', 'Premium imported salmon', 850.00, 800.00, 6, '/images/products/norwegian-salmon.jpg', 20, '500g', TRUE),
 
 -- Insert detailed products - Frozen Foods (new category)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('McCain French Fries', 'Frozen potato fries', 180.00, 170.00, 7, '/images/products/mccain-fries.jpg', 50, '450g', TRUE),
 ('Frozen Mixed Vegetables', 'Mix of peas, carrots, and corn', 140.00, 130.00, 7, '/images/products/mixed-veg.jpg', 60, '500g', FALSE),
 ('Al Kabeer Chicken Nuggets', 'Breaded chicken nuggets', 220.00, 200.00, 7, '/images/products/nuggets.jpg', 40, '500g', TRUE),
@@ -270,73 +264,65 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Venkys Burger Patty', 'Chicken burger patties', 220.00, 200.00, 7, '/images/products/chicken-patty.jpg', 35, '360g', FALSE),
 ('Kwality Walls Magnum', 'Chocolate coated ice cream bar', 90.00, 85.00, 7, '/images/products/magnum.jpg', 60, 'piece', TRUE),
 ('Sumeru Aloo Paratha', 'Frozen stuffed potato parathas', 190.00, 180.00, 7, '/images/products/aloo-paratha.jpg', 40, 'pack of 4', FALSE),
-('Godrej Vegetable Spring Rolls', 'Frozen vegetable spring rolls', 180.00, 170.00, 7, '/images/products/spring-rolls.jpg', 35, '300g', TRUE);
+('Godrej Vegetable Spring Rolls', 'Frozen vegetable spring rolls', 180.00, 170.00, 7, '/images/products/spring-rolls.jpg', 35, '300g', TRUE),
 
 -- Insert sample data for other categories briefly
 -- Insert some Personal Care products (Category 8)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Dove Soap', 'Moisturizing beauty bar', 45.00, 42.00, 8, '/images/products/dove.jpg', 100, 'piece', TRUE),
 ('Pantene Shampoo', 'Pro-V nourishing shampoo', 180.00, 170.00, 8, '/images/products/pantene.jpg', 60, '340ml', TRUE),
 ('Colgate MaxFresh', 'Cooling crystal toothpaste', 90.00, 85.00, 8, '/images/products/colgate.jpg', 80, '150g', FALSE),
 ('Nivea Men Face Wash', 'Oil control face wash', 220.00, 210.00, 8, '/images/products/nivea-face.jpg', 50, '100ml', TRUE),
-('Gillette Mach3', 'Triple blade razor', 350.00, 330.00, 8, '/images/products/gillette.jpg', 40, 'piece', FALSE);
+('Gillette Mach3', 'Triple blade razor', 350.00, 330.00, 8, '/images/products/gillette.jpg', 40, 'piece', FALSE),
 
 -- Insert some Baby Products (Category 9)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Pampers Diapers', 'Baby dry diapers medium size', 650.00, 620.00, 9, '/images/products/pampers.jpg', 30, 'pack of 42', TRUE),
 ('Cerelac Wheat', 'Baby cereal food', 350.00, 340.00, 9, '/images/products/cerelac.jpg', 40, '300g', FALSE),
 ('Johnsons Baby Powder', 'Baby talcum powder', 180.00, 170.00, 9, '/images/products/johnsons.jpg', 50, '200g', TRUE),
 ('Enfamil Baby Formula', 'Infant milk formula', 750.00, 730.00, 9, '/images/products/enfamil.jpg', 25, '400g', FALSE),
-('Himalaya Baby Wipes', 'Gentle baby wipes', 150.00, 140.00, 9, '/images/products/baby-wipes.jpg', 60, 'pack of 72', TRUE);
+('Himalaya Baby Wipes', 'Gentle baby wipes', 150.00, 140.00, 9, '/images/products/baby-wipes.jpg', 60, 'pack of 72', TRUE),
 
 -- Insert some Pet Supplies (Category 10)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Pedigree Adult Dog Food', 'Chicken and vegetables', 650.00, 620.00, 10, '/images/products/pedigree.jpg', 30, '3kg', TRUE),
 ('Whiskas Cat Food', 'Tuna flavor', 450.00, 430.00, 10, '/images/products/whiskas.jpg', 40, '1.2kg', FALSE),
 ('Pet Collar', 'Adjustable dog collar', 350.00, 330.00, 10, '/images/products/collar.jpg', 30, 'piece', TRUE),
 ('Cat Litter', 'Clumping cat litter', 450.00, 430.00, 10, '/images/products/cat-litter.jpg', 25, '5kg', FALSE),
-('Pet Toy', 'Squeaky rubber toy', 220.00, 200.00, 10, '/images/products/pet-toy.jpg', 45, 'piece', TRUE);
+('Pet Toy', 'Squeaky rubber toy', 220.00, 200.00, 10, '/images/products/pet-toy.jpg', 45, 'piece', TRUE),
 
 -- Insert some Breakfast & Cereal products (Category 11)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Kelloggs Corn Flakes', 'Original corn flakes', 220.00, 210.00, 11, '/images/products/cornflakes.jpg', 50, '500g', TRUE),
 ('Quaker Oats', 'Rolled whole grain oats', 240.00, 230.00, 11, '/images/products/quaker.jpg', 60, '1kg', FALSE),
 ('Nutella Hazelnut Spread', 'Chocolate hazelnut spread', 350.00, 330.00, 11, '/images/products/nutella.jpg', 40, '350g', TRUE),
 ('MTR Breakfast Mix - Upma', 'Ready upma mix', 60.00, 55.00, 11, '/images/products/upma.jpg', 80, '200g', FALSE),
-('Saffola Masala Oats', 'Spiced instant oats', 45.00, 42.00, 11, '/images/products/masala-oats.jpg', 100, '40g', TRUE);
+('Saffola Masala Oats', 'Spiced instant oats', 45.00, 42.00, 11, '/images/products/masala-oats.jpg', 100, '40g', TRUE),
 
 -- Insert some Condiments & Sauces (Category 12)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Kissan Tomato Ketchup', 'Tomato ketchup', 120.00, 110.00, 12, '/images/products/kissan.jpg', 70, '500g', TRUE),
 ('Hellmanns Mayonnaise', 'Real mayonnaise', 250.00, 240.00, 12, '/images/products/hellmanns.jpg', 40, '400g', FALSE),
 ('Maggi Hot & Sweet Sauce', 'Tomato chilli sauce', 140.00, 130.00, 12, '/images/products/maggi-sauce.jpg', 60, '500g', TRUE),
 ('Heinz Yellow Mustard', 'Classic yellow mustard', 280.00, 270.00, 12, '/images/products/mustard.jpg', 30, '240g', FALSE),
-('Chings Schezwan Chutney', 'Spicy schezwan sauce', 90.00, 85.00, 12, '/images/products/schezwan.jpg', 80, '250g', TRUE);
+('Chings Schezwan Chutney', 'Spicy schezwan sauce', 90.00, 85.00, 12, '/images/products/schezwan.jpg', 80, '250g', TRUE),
 
 -- Insert some Canned & Packaged Foods (Category 13)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Del Monte Baked Beans', 'Baked beans in tomato sauce', 120.00, 110.00, 13, '/images/products/baked-beans.jpg', 60, '450g', TRUE),
 ('American Garden Sweet Corn', 'Canned sweet corn', 180.00, 170.00, 13, '/images/products/canned-corn.jpg', 50, '400g', FALSE),
 ('MTR Ready to Eat Dal Makhani', 'Instant dal makhani', 90.00, 85.00, 13, '/images/products/dal-makhani.jpg', 70, '300g', TRUE),
 ('Patanjali Honey', 'Pure honey', 250.00, 240.00, 13, '/images/products/honey.jpg', 50, '500g', FALSE),
-('Nestle Milkmaid', 'Sweetened condensed milk', 130.00, 125.00, 13, '/images/products/milkmaid.jpg', 60, '400g', TRUE);
+('Nestle Milkmaid', 'Sweetened condensed milk', 130.00, 125.00, 13, '/images/products/milkmaid.jpg', 60, '400g', TRUE),
 
 -- Insert some Health Foods & Supplements (Category 14)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Ensure Protein Powder', 'Nutritional powder', 650.00, 630.00, 14, '/images/products/ensure.jpg', 30, '400g', TRUE),
 ('Himalaya Ashwagandha', 'Herbal supplement', 190.00, 180.00, 14, '/images/products/ashwagandha.jpg', 50, '60 tablets', FALSE),
 ('Pro360 Weight Gainer', 'High protein weight gainer', 750.00, 730.00, 14, '/images/products/weight-gainer.jpg', 25, '500g', TRUE),
 ('Bournvita Health Drink', 'Malt based health drink', 240.00, 230.00, 14, '/images/products/bournvita-pro.jpg', 50, '500g', FALSE),
-('Zandu Chyawanprash', 'Ayurvedic health supplement', 350.00, 340.00, 14, '/images/products/chyawanprash.jpg', 40, '900g', TRUE);
+('Zandu Chyawanprash', 'Ayurvedic health supplement', 350.00, 340.00, 14, '/images/products/chyawanprash.jpg', 40, '900g', TRUE),
 
 -- Insert some Home & Kitchen products (Category 15)
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Prestige Pressure Cooker', '3 liter pressure cooker', 1450.00, 1400.00, 15, '/images/products/pressure-cooker.jpg', 25, 'piece', TRUE),
 ('Pigeon Non-stick Tawa', '28cm non-stick flat pan', 650.00, 620.00, 15, '/images/products/tawa.jpg', 30, 'piece', FALSE),
 ('Milton Water Bottle', 'Stainless steel bottle', 450.00, 430.00, 15, '/images/products/water-bottle.jpg', 50, '1L', TRUE),
 ('Cello Glassware Set', 'Set of 6 glasses', 350.00, 330.00, 15, '/images/products/glassware.jpg', 40, 'set', FALSE),
-('Hawkins Cooker Gasket', 'Pressure cooker rubber gasket', 120.00, 110.00, 15, '/images/products/gasket.jpg', 80, 'piece', TRUE);
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
+('Hawkins Cooker Gasket', 'Pressure cooker rubber gasket', 120.00, 110.00, 15, '/images/products/gasket.jpg', 80, 'piece', TRUE),
+
 ('iPhone 14 Pro', '256GB, Deep Purple, 6.1-inch display', 129999, 124999, 16, '/images/products/iphone14pro.jpg', 15, 'piece', TRUE),
 ('Samsung Galaxy S23 Ultra', '512GB - Phantom Black', 124999, 119999, 16, '/images/products/galaxy-s23.jpg', 10, 'piece', TRUE),
 ('OnePlus Nord CE 3 Lite', '128GB - Pastel Lime', 19999, 18499, 16, '/images/products/oneplus-nord.jpg', 50, 'piece', FALSE),
@@ -713,10 +699,9 @@ INSERT INTO products (name, description, price, discount_price, category_id, ima
 ('Bookshelf', '5-tier wooden bookshelf with adjustable shelves', 5500.00, 4999.00, 26, '/images/products/bookshelf.jpg', 20, 'piece', FALSE),
 ('Iron', 'Steam iron with ceramic soleplate and spray function', 2200.00, 1899.00, 26, '/images/products/steam-iron.jpg', 60, 'piece', FALSE),
 ('Trash Can', 'Stainless steel pedal trash can with removable liner', 1500.00, 1299.00, 26, '/images/products/trash-can.jpg', 75, 'piece', FALSE),
-('Wall Clock', 'Decorative wooden wall clock with silent movement', 1200.00, 999.00, 26, '/images/products/wall-clock.jpg', 80, 'piece', FALSE);
+('Wall Clock', 'Decorative wooden wall clock with silent movement', 1200.00, 999.00, 26, '/images/products/wall-clock.jpg', 80, 'piece', FALSE),
 
 -- Automotive Products (30 items) - category_id = 27
-INSERT INTO products (name, description, price, discount_price, category_id, image_url, stock_quantity, unit, is_featured) VALUES
 ('Car Seat Covers', 'Premium leather car seat covers set for 5-seater', 3500.00, 2999.00, 27, '/images/products/seat-covers.jpg', 40, 'set', TRUE),
 ('Car Dashboard Camera', 'Full HD 1080p dashboard camera with night vision', 5500.00, 4999.00, 27, '/images/products/dash-cam.jpg', 35, 'piece', TRUE),
 ('Car Air Freshener', 'Long-lasting gel car air freshener, multiple fragrances', 250.00, 199.00, 27, '/images/products/air-freshener.jpg', 200, 'piece', FALSE),
@@ -801,7 +786,3 @@ INSERT INTO cart_items (cart_id, product_id, quantity) VALUES
 (3, 4, 1),
 (3, 12, 2),
 (3, 16, 1);
-
-UPDATE users
-SET is_admin = TRUE
-WHERE name = 'Sanskar Sharma';

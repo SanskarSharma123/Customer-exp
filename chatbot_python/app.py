@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from intent_service import classify_intent
 from prompt.get_category import get_category_prompt
 from prompt.get_category_min_max import get_category_min_max
-from prompt.order_details import get_order_details_prompt
 from prompt.get_product_id_prompt import get_productid_quantity
 from langchain_ollama import OllamaLLM
 import requests
@@ -22,7 +21,6 @@ from handlers.product_details import handle_product_details
 from handlers.price_filter import handle_price_filter
 from handlers.offers_discounts import handle_offers_discounts
 from handlers.cart_management import handle_cart_management
-from handlers.order_placement import handle_order_placement
 from handlers.order_tracking import handle_order_tracking
 from handlers.return_refund import handle_return_refund
 from handlers.payment_queries import handle_payment_queries

@@ -1,12 +1,10 @@
 const express = require('express');
-const axios = require('axios');
 const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const Groq = require('groq-sdk');
 require('dotenv').config();
 
 
@@ -17,39 +15,25 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:8000'],
+  origin: 'http://localhost:3000',
   credentials: true
 }));
 
-const SENTIMENT_API_URL = process.env.SENTIMENT_API_URL || "http://localhost:5001";
+
+
 // PostgreSQL connection pool
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'database4',
-  password: process.env.DB_PASSWORD || 'Helloace@135',
-  port: process.env.DB_PORT || 5433,
+  user:  'postgres',
+  host: 'localhost',
+  database: 'database4',
+  password: 'Helloace@135',
+  port: 5433,
 });
 
 // Secret key for JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'quickcommerce-secret-key';
 
 // Middleware to authenticate JWT
-// const authenticateToken = (req, res, next) => {
-//   const token = req.cookies.token;
-  
-//   if (!token) {
-//     return res.status(401).json({ message: 'Unauthorized: No token provided' });
-//   }
-
-//   jwt.verify(token, JWT_SECRET, (err, decoded) => {
-//     if (err) {
-//       return res.status(403).json({ message: 'Forbidden: Invalid token' });
-//     }
-//     req.user = decoded;
-//     next();
-//   });
-// };
 const authenticateToken = (req, res, next) => {
   let token = req.cookies.token;
 
@@ -81,6 +65,7 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
 
 // Middleware to check if user is admin
 const isAdmin = (req, res, next) => {
@@ -143,33 +128,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Get all reviews with user and product details
-const getAllReviewsWithDetails = async () => {
-  const query = `
-    SELECT 
-      r.review_id,
-      r.product_id,
-      r.user_id,
-      r.rating,
-      r.comment,
-      r.sentiment_score,
-      r.sentiment_label,
-      r.sentiment_confidence,
-      r.created_at,
-      r.updated_at,
-      u.name as user_name,
-      u.email as user_email,
-      p.name as product_name,
-      p.image_url as product_image
-    FROM reviews r
-    JOIN users u ON r.user_id = u.user_id
-    JOIN products p ON r.product_id = p.product_id
-    ORDER BY r.created_at DESC
-  `;
-  
-  const result = await pool.query(query);
-  return result.rows;
-};
+
 // Get all products
 app.get('/api/products', async (req, res) => {
   try {
@@ -224,7 +183,6 @@ app.post('/api/login', async (req, res) => {
     
     res.json({
       message: 'Login successful',
-      token: token,
       user: {
         id: user.user_id,
         name: user.name,
@@ -539,69 +497,34 @@ app.delete('/api/cart/items/:itemId', authenticateToken, async (req, res) => {
 // Add review routes
 app.post('/api/products/:productId/reviews', authenticateToken, async (req, res) => {
   try {
-    const productId = req.params.productId;
-    const userId = req.user.userId;
-    const { rating, comment } = req.body;
+      const productId = req.params.productId;
+      const { rating, comment } = req.body;
 
-    // Validate rating
-    if (rating < 1 || rating > 5) {
-      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
-    }
-
-    // Check for existing review
-    const existingReview = await pool.query(
-      'SELECT * FROM reviews WHERE product_id = $1 AND user_id = $2',
-      [productId, userId]
-    );
-    
-    if (existingReview.rows.length > 0) {
-      return res.status(400).json({ message: 'You have already reviewed this product' });
-    }
-
-    // Analyze sentiment
-    let sentimentData = { 
-      sentiment_score: null,
-      sentiment_label: null,
-      sentiment_confidence: null
-    };
-    
-    if (comment && comment.trim() !== '') {
-      try {
-        const sentimentResponse = await axios.post(
-          `${SENTIMENT_API_URL}/analyze-sentiment`,
-          { text: comment.trim(), rating },
-          { timeout: 10000 }
-        );
-        
-        if (sentimentResponse.data && sentimentResponse.data.success) {
-          sentimentData = sentimentResponse.data.sentiment;
-        }
-      } catch (error) {
-        console.error('Sentiment analysis error:', error);
+      // Validate rating
+      if (rating < 1 || rating > 5) {
+          return res.status(400).json({ message: 'Rating must be between 1 and 5' });
       }
-    }
 
-    // Insert review with sentiment data
-    const result = await pool.query(
-      `INSERT INTO reviews (
-        product_id, user_id, rating, comment,
-        sentiment_score, sentiment_label, sentiment_confidence
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        productId,
-        userId,
-        rating,
-        comment,
-        sentimentData.sentiment_score,
-        sentimentData.sentiment_label,
-        sentimentData.confidence
-      ]
-    );
+      // Check if user already reviewed this product
+      const existingReview = await pool.query(
+          'SELECT * FROM reviews WHERE product_id = $1 AND user_id = $2',
+          [productId, req.user.userId]
+      );
 
-    res.status(201).json(result.rows[0]);
+      if (existingReview.rows.length > 0) {
+          return res.status(400).json({ message: 'You have already reviewed this product' });
+      }
+
+      // Create new review
+      const result = await pool.query(
+          'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING *',
+          [productId, req.user.userId, rating, comment]
+      );
+
+      res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Review creation error:', error);
-    res.status(500).json({ message: 'Server error creating review' });
+      console.error('Review creation error:', error);
+      res.status(500).json({ message: 'Server error creating review' });
   }
 });
 
@@ -690,301 +613,6 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
   } catch (error) {
       console.error('Error fetching reviews:', error);
       res.status(500).json({ message: 'Server error fetching reviews' });
-  }
-});
-app.post('/products/:productId/reviews', async (req, res) => {
-  try {
-      // Get user ID from session/auth
-      const userId = req.session?.user_id || req.user?.id;
-      if (!userId) {
-          return res.status(401).json({
-              success: false,
-              message: 'Authentication required'
-          });
-      }
-
-      const { productId } = req.params;
-      const { rating, comment, sentiment_score, sentiment_label, sentiment_confidence } = req.body;
-
-      // Validate input
-      if (!rating || rating < 1 || rating > 5) {
-          return res.status(400).json({
-              success: false,
-              message: 'Valid rating (1-5) is required'
-          });
-      }
-
-      // Check if user has already reviewed this product
-      const existingReviewQuery = `
-          SELECT review_id FROM reviews 
-          WHERE user_id = $1 AND product_id = $2
-      `;
-      
-      const existingReview = await db.query(existingReviewQuery, [userId, productId]);
-      
-      if (existingReview.rows.length > 0) {
-          return res.status(400).json({
-              success: false,
-              message: 'You have already reviewed this product'
-          });
-      }
-
-      // Get or calculate sentiment analysis
-      let sentimentData = {
-          sentiment_score,
-          sentiment_label,
-          confidence: sentiment_confidence
-      };
-
-      // If sentiment data not provided, analyze it using your Python service
-      if (!sentiment_score && comment && comment.trim()) {
-          try {
-              console.log('Analyzing sentiment for comment:', comment);
-              
-              const sentimentResponse = await axios.post(
-                  `${SENTIMENT_API_URL}/analyze-sentiment`,
-                  {
-                      text: comment.trim(),
-                      rating: rating
-                  },
-                  {
-                      timeout: 10000,
-                      headers: {
-                          'Content-Type': 'application/json'
-                      }
-                  }
-              );
-
-              if (sentimentResponse.data && sentimentResponse.data.success) {
-                  const sentiment = sentimentResponse.data.sentiment;
-                  sentimentData = {
-                      sentiment_score: sentiment.sentiment_score,
-                      sentiment_label: sentiment.sentiment_label,
-                      confidence: sentiment.confidence
-                  };
-                  console.log('Sentiment analysis successful:', sentimentData);
-              } else {
-                  console.warn('Sentiment analysis returned no data');
-              }
-              
-          } catch (sentimentError) {
-              console.warn('Sentiment analysis failed:', sentimentError.message);
-              // Continue without sentiment data - not critical for review submission
-              sentimentData = {
-                  sentiment_score: null,
-                  sentiment_label: null,
-                  confidence: null
-              };
-          }
-      }
-      if (!sentimentData.sentiment_score && comment && comment.trim()) {
-        // Simple rating-based sentiment mapping
-        const sentimentMapping = {
-            1: { score: 2.0, label: 'highly negative' },
-            2: { score: 4.0, label: 'negative' },
-            3: { score: 6.0, label: 'neutral' },
-            4: { score: 8.0, label: 'positive' },
-            5: { score: 9.5, label: 'highly positive' }
-        };
-        
-        sentimentData = sentimentMapping[rating] || { 
-            score: 6.0, 
-            label: 'neutral',
-            confidence: 0.7
-        };
-    }
-
-      // Start database transaction
-      const client = await db.connect();
-      
-      try {
-          await client.query('BEGIN');
-
-          // Check if the product exists
-          const productCheck = await client.query(
-              'SELECT product_id FROM products WHERE product_id = $1',
-              [productId]
-          );
-
-          if (productCheck.rows.length === 0) {
-              await client.query('ROLLBACK');
-              return res.status(404).json({
-                  success: false,
-                  message: 'Product not found'
-              });
-          }
-
-          // Insert the review
-          const insertQuery = `
-              INSERT INTO reviews (
-                  product_id, user_id, rating, comment, 
-                  sentiment_score, sentiment_label, sentiment_confidence,
-                  created_at, updated_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-              RETURNING review_id, created_at
-          `;
-
-          const reviewResult = await client.query(insertQuery, [
-              productId,
-              userId,
-              rating,
-              comment || '',
-              sentimentData.sentiment_score,
-              sentimentData.sentiment_label,
-              sentimentData.confidence
-          ]);
-
-          const newReview = reviewResult.rows[0];
-
-          // Get user info for response
-          const userQuery = 'SELECT name FROM users WHERE user_id = $1';
-          const userResult = await client.query(userQuery, [userId]);
-          const userName = userResult.rows[0]?.name || `User ${userId}`;
-
-          await client.query('COMMIT');
-
-          // Prepare response
-          const reviewData = {
-              review_id: newReview.review_id,
-              product_id: parseInt(productId),
-              user_id: userId,
-              user_name: userName,
-              rating: rating,
-              comment: comment || '',
-              created_at: newReview.created_at,
-              sentiment_analysis: sentimentData.sentiment_score ? {
-                  sentiment_score: sentimentData.sentiment_score,
-                  sentiment_label: sentimentData.sentiment_label,
-                  confidence: sentimentData.confidence
-              } : null
-          };
-
-          res.status(201).json({
-              success: true,
-              message: 'Review submitted successfully',
-              review: reviewData
-          });
-
-      } catch (dbError) {
-          await client.query('ROLLBACK');
-          throw dbError;
-      } finally {
-          client.release();
-      }
-
-  } catch (error) {
-      console.error('Error submitting review:', error);
-      res.status(500).json({
-          success: false,
-          message: 'An error occurred while submitting your review'
-      });
-  }
-});
-
-app.post('/analyze-sentiment', async (req, res) => {
-  try {
-      const { text, rating } = req.body;
-
-      if (!text || !text.trim()) {
-          return res.status(400).json({
-              success: false,
-              message: 'Text is required for sentiment analysis'
-          });
-      }
-
-      const sentimentResponse = await axios.post(
-          `${SENTIMENT_API_URL}/analyze-sentiment`,
-          { text: text.trim(), rating },
-          {
-              timeout: 10000,
-              headers: { 'Content-Type': 'application/json' }
-          }
-      );
-
-      if (sentimentResponse.data && sentimentResponse.data.success) {
-          res.json({
-              success: true,
-              sentiment: sentimentResponse.data.sentiment
-          });
-      } else {
-          res.status(500).json({
-              success: false,
-              message: 'Sentiment analysis failed'
-          });
-      }
-
-  } catch (error) {
-      console.error('Sentiment analysis error:', error);
-      res.status(500).json({
-          success: false,
-          message: 'Failed to analyze sentiment'
-      });
-  }
-});
-
-// Route to get reviews for a product (enhanced with sentiment data)
-app.get('/products/:productId/reviews', async (req, res) => {
-  try {
-      const { productId } = req.params;
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const offset = (page - 1) * limit;
-
-      const query = `
-          SELECT 
-              r.review_id, r.product_id, r.user_id, r.rating, r.comment,
-              r.sentiment_score, r.sentiment_label, r.sentiment_confidence,
-              r.created_at, r.updated_at,
-              u.name as user_name
-          FROM reviews r
-          JOIN users u ON r.user_id = u.user_id
-          WHERE r.product_id = $1
-          ORDER BY r.created_at DESC
-          LIMIT $2 OFFSET $3
-      `;
-
-      const reviews = await db.query(query, [productId, limit, offset]);
-
-      // Get total count for pagination
-      const countQuery = 'SELECT COUNT(*) FROM reviews WHERE product_id = $1';
-      const countResult = await db.query(countQuery, [productId]);
-      const totalReviews = parseInt(countResult.rows[0].count);
-
-      // Format reviews with sentiment data
-      const formattedReviews = reviews.rows.map(review => ({
-          review_id: review.review_id,
-          product_id: review.product_id,
-          user_id: review.user_id,
-          user_name: review.user_name,
-          rating: review.rating,
-          comment: review.comment,
-          created_at: review.created_at,
-          updated_at: review.updated_at,
-          sentiment_analysis: review.sentiment_score ? {
-              sentiment_score: review.sentiment_score,
-              sentiment_label: review.sentiment_label,
-              confidence: review.sentiment_confidence
-          } : null
-      }));
-
-      res.json({
-          success: true,
-          reviews: formattedReviews,
-          pagination: {
-              current_page: page,
-              total_pages: Math.ceil(totalReviews / limit),
-              total_reviews: totalReviews,
-              has_next: page < Math.ceil(totalReviews / limit),
-              has_prev: page > 1
-          }
-      });
-
-  } catch (error) {
-      console.error('Error fetching reviews:', error);
-      res.status(500).json({
-          success: false,
-          message: 'Failed to fetch reviews'
-      });
   }
 });
 
@@ -1103,150 +731,6 @@ app.get('/api/products/:productId', async (req, res) => {
       res.status(500).json({ message: 'Server error fetching product' });
   }
 });
-// app.post('/api/orders', authenticateToken, async (req, res) => {
-//   console.log('🔍 ==> Order request received');
-//   console.log('🔍 User:', req.user);
-//   console.log('🔍 Body:', req.body);
-//   console.log('🔍 Headers:', req.headers);
-  
-//   try {
-//     let { addressId, paymentMethod } = req.body;
-    
-//     addressId = parseInt(addressId);
-    
-//     // Validate required fields
-//     if (!addressId) {
-//       console.log('❌ Missing addressId');
-//       return res.status(400).json({ message: 'Address ID is required' });
-//     }
-    
-//     if (!paymentMethod) {
-//       console.log('❌ Missing paymentMethod');
-//       return res.status(400).json({ message: 'Payment method is required' });
-//     }
-    
-//     const client = await pool.connect();
-    
-//     try {
-//       await client.query('BEGIN');
-      
-//       // Get user's cart
-//       console.log('🔍 Fetching cart for user:', req.user.userId);
-//       const carts = await client.query(
-//         'SELECT * FROM cart WHERE user_id = $1',
-//         [req.user.userId]
-//       );
-      
-//       console.log('🔍 Cart results:', carts.rows.length);
-      
-//       if (carts.rows.length === 0) {
-//         console.log('❌ Cart is empty');
-//         await client.query('ROLLBACK');
-//         return res.status(400).json({ message: 'Cart is empty' });
-//       }
-
-      
-//       const cartId = carts.rows[0].cart_id;
-      
-//       // Get cart items with product details
-//       const items = await client.query(
-//         `SELECT ci.quantity, p.product_id, p.price, p.discount_price 
-//          FROM cart_items ci
-//          JOIN products p ON ci.product_id = p.product_id
-//          WHERE ci.cart_id = $1`,
-//         [cartId]
-//       );
-      
-//       if (items.rows.length === 0) {
-//         await client.query('ROLLBACK');
-//         return res.status(400).json({ message: 'Cart is empty' });
-//       }
-      
-//       // Calculate total amount
-//       let totalAmount = 0;
-//       items.rows.forEach(item => {
-//         const price = item.discount_price || item.price;
-//         totalAmount += price * item.quantity;
-//       });
-      
-//       // Apply delivery fee if total is less than 500
-//       const deliveryFee = totalAmount < 500 ? 20.00 : 0.00;
-//       totalAmount += deliveryFee;
-      
-//       // Create order with delivery time estimate (10-15 minutes)
-//       const estimatedDeliveryTime = new Date(Date.now() + 15 * 60000); // 15 minutes from now
-      
-//       const orderResult = await client.query(
-//         `INSERT INTO orders (user_id, address_id, total_amount, delivery_fee, status, 
-//          payment_method, payment_status, estimated_delivery_time)
-//          VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7) RETURNING order_id`,
-//         [req.user.userId, addressId, totalAmount, deliveryFee, paymentMethod, 
-//          paymentMethod === 'cash_on_delivery' ? 'pending' : 'completed', 
-//          estimatedDeliveryTime]
-//       );
-      
-//       const orderId = orderResult.rows[0].order_id;
-      
-//       // Add order items
-//       for (const item of items.rows) {
-//         const price = item.discount_price || item.price;
-//         await client.query(
-//           'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
-//           [orderId, item.product_id, item.quantity, price]
-//         );
-        
-//         // Update product stock
-//         await client.query(
-//           'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE product_id = $2',
-//           [item.quantity, item.product_id]
-//         );
-//       }
-      
-//       // Initialize order tracking
-//       await client.query(
-//         'INSERT INTO order_tracking (order_id, status, location) VALUES ($1, $2, $3)',
-//         [orderId, "pending", "Order received"]
-//       );
-      
-//       // Get address details to fetch latitude and longitude
-//       const addressResult = await client.query(
-//         'SELECT latitude, longitude FROM addresses WHERE address_id = $1',
-//         [addressId]
-//       );
-      
-//       console.log('🔍 Address Query Result:', addressResult.rows);
-//       if (addressResult.rows.length > 0) {
-//         const { latitude, longitude } = addressResult.rows[0];
-        
-//         // Add entry to delivery_locations table with user's address coordinates
-//         await client.query(
-//           'INSERT INTO delivery_locations (order_id, personnel_id, latitude, longitude) VALUES ($1, $2, $3, $4)',
-//           [orderId, 1, latitude, longitude]
-//         );
-//       }
-      
-//       // Clear the cart
-//       await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
-      
-//       await client.query('COMMIT');
-      
-//       res.status(201).json({
-//         message: 'Order placed successfully',
-//         orderId,
-//         estimatedDeliveryTime
-//       });
-//     } catch (error) {
-//       await client.query('ROLLBACK');
-//       throw error;
-//     } finally {
-//       client.release();
-//     }
-//   } catch (error) {
-//     console.error('Order creation error:', error);
-//     res.status(500).json({ message: 'Server error placing order' });
-//   }
-// });
-
 app.post('/api/orders', authenticateToken, async (req, res) => {
   try {
     const { addressId, paymentMethod } = req.body;
@@ -1631,55 +1115,7 @@ app.get('/api/orders/:orderId/tracking', authenticateToken, async (req, res) => 
 // });
 
 // ADMIN ROUTES
-app.get('/api/admin/reviews', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const reviews = await pool.query(`
-      SELECT 
-        r.review_id,
-        r.product_id,
-        r.user_id,
-        r.rating,
-        r.comment,
-        r.sentiment_score,
-        r.sentiment_label,
-        r.sentiment_confidence,
-        r.created_at,
-        r.updated_at,
-        u.name as user_name,
-        u.email as user_email,
-        p.name as product_name,
-        p.image_url as product_image
-      FROM reviews r
-      JOIN users u ON r.user_id = u.user_id
-      JOIN products p ON r.product_id = p.product_id
-      ORDER BY r.created_at DESC
-    `);
-    res.json(reviews.rows);
-  } catch (error) {
-    console.error('Admin reviews fetch error:', error);
-    res.status(500).json({ message: 'Server error fetching reviews' });
-  }
-});
 
-app.delete('/api/admin/reviews/:reviewId', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { reviewId } = req.params;
-    
-    const result = await pool.query(
-      'DELETE FROM reviews WHERE review_id = $1 RETURNING *',
-      [reviewId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Review not found' });
-    }
-    
-    res.json({ message: 'Review deleted successfully' });
-  } catch (error) {
-    console.error('Admin review delete error:', error);
-    res.status(500).json({ message: 'Server error deleting review' });
-  }
-});
 // Admin: Get all users
 app.get('/api/admin/users', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -1781,206 +1217,7 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
     res.status(500).json(errorResponse);
   }
 });
-// Add this route to your admin routes
-app.post('/api/admin/generate-product-suggestions', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { productName } = req.body;
-    
-    console.log('Received product suggestion request for:', productName);
-    
-    if (!productName || !productName.trim()) {
-      return res.status(400).json({ message: 'Product name is required' });
-    }
 
-    // Make sure to set this in your .env file
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
-    
-    if (!GROQ_API_KEY) {
-      console.error('GROQ_API_KEY not found in environment variables');
-      return res.status(500).json({ 
-        message: 'AI service configuration error - API key missing'
-      });
-    }
-
-    // Import Groq SDK
-    let Groq;
-    try {
-      Groq = require('groq-sdk');
-    } catch (importError) {
-      console.error('Groq SDK import error:', importError);
-      return res.status(500).json({ 
-        message: 'AI service dependency missing. Please install groq-sdk'
-      });
-    }
-
-    const groq = new Groq({
-      apiKey: GROQ_API_KEY
-    });
-
-    const prompt = `You are a product catalog expert for an Indian e-commerce store. Given a product name, provide realistic product details.
-
-Product name: "${productName.trim()}"
-
-Please respond with ONLY a valid JSON object containing exactly these fields:
-{
-  "name": "improved/formatted product name",
-  "description": "detailed product description (2-3 sentences)",
-  "price": 25000,
-  "category": "Electronics",
-  "unit": "pieces",
-  "stock_quantity": 10,
-  "image_url": ""
-}
-
-Categories to choose from: Electronics, Fruits & Vegetables, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Snacks & Confectionery, Personal Care, Household Items, Books & Stationery, Sports & Fitness
-
-Important: 
-- Price should be in Indian Rupees (number only, no currency symbol)
-- Respond with ONLY the JSON object, no additional text or formatting
-- Do not wrap in markdown code blocks`;
-
-    console.log('Sending request to Groq API...');
-
-    const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      // Updated model - choose one of these based on your needs:
-      model: "llama-3.3-70b-versatile", // Best for complex tasks
-      // model: "llama-3.1-8b-instant",   // Faster, good for simpler tasks
-      // model: "llama3-70b-8192",        // Good balance
-      // model: "llama3-8b-8192",         // Fastest
-      temperature: 0.3,
-      max_tokens: 500,
-      top_p: 1,
-      stream: false
-    });
-
-    const responseText = completion.choices[0]?.message?.content;
-    
-    console.log('Raw AI response:', responseText);
-    
-    if (!responseText) {
-      throw new Error('No response content from AI service');
-    }
-
-    // Clean the response text more thoroughly
-    let cleanedResponse = responseText.trim();
-    
-    // Remove any potential markdown formatting
-    cleanedResponse = cleanedResponse
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/gi, '')
-      .replace(/^json\s*/gi, '')
-      .trim();
-
-    // Find JSON object boundaries
-    const jsonStart = cleanedResponse.indexOf('{');
-    const jsonEnd = cleanedResponse.lastIndexOf('}');
-    
-    if (jsonStart === -1 || jsonEnd === -1) {
-      throw new Error('No valid JSON object found in AI response');
-    }
-    
-    cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd + 1);
-    
-    console.log('Cleaned response:', cleanedResponse);
-
-    // Parse the JSON response
-    let suggestions;
-    try {
-      suggestions = JSON.parse(cleanedResponse);
-    } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Attempted to parse:', cleanedResponse);
-      
-      // Fallback: create a basic suggestion
-      suggestions = {
-        name: productName.trim(),
-        description: `High-quality ${productName.trim()} with excellent features and reliability.`,
-        price: 1000,
-        category: "Electronics",
-        unit: "pieces",
-        stock_quantity: 10,
-        image_url: ""
-      };
-      
-      console.log('Using fallback suggestion due to parse error');
-    }
-
-    // Validate and sanitize the response
-    const requiredFields = ['name', 'description', 'price', 'category', 'unit', 'stock_quantity'];
-    const missingFields = requiredFields.filter(field => !suggestions.hasOwnProperty(field));
-    
-    if (missingFields.length > 0) {
-      console.log('Missing fields detected:', missingFields);
-      // Fill in missing fields with defaults
-      if (!suggestions.name) suggestions.name = productName.trim();
-      if (!suggestions.description) suggestions.description = `Quality ${productName.trim()} product`;
-      if (!suggestions.price) suggestions.price = 100;
-      if (!suggestions.category) suggestions.category = "General";
-      if (!suggestions.unit) suggestions.unit = "pieces";
-      if (!suggestions.stock_quantity) suggestions.stock_quantity = 10;
-    }
-
-    // Ensure correct data types
-    suggestions.price = parseFloat(suggestions.price) || 100;
-    suggestions.stock_quantity = parseInt(suggestions.stock_quantity) || 10;
-    suggestions.image_url = suggestions.image_url || "";
-
-    // Validate price is reasonable
-    if (suggestions.price < 1 || suggestions.price > 1000000) {
-      suggestions.price = 100; // Default fallback price
-    }
-
-    // Validate stock quantity is reasonable
-    if (suggestions.stock_quantity < 1 || suggestions.stock_quantity > 1000) {
-      suggestions.stock_quantity = 10; // Default fallback stock
-    }
-
-    console.log('Final suggestions:', suggestions);
-    console.log('Successfully generated suggestions for:', productName);
-    
-    res.json(suggestions);
-
-  } catch (error) {
-    console.error('Product suggestion error:', error);
-    console.error('Error stack:', error.stack);
-    
-    // Provide more specific error messages based on error type
-    let errorMessage = 'Failed to generate product suggestions';
-    let statusCode = 500;
-    
-    if (error.message.includes('API key') || error.message.includes('authentication')) {
-      errorMessage = 'AI service authentication failed';
-      statusCode = 500;
-    } else if (error.message.includes('JSON') || error.message.includes('parse')) {
-      errorMessage = 'AI service returned invalid data format';
-      statusCode = 500;
-    } else if (error.message.includes('No response') || error.message.includes('timeout')) {
-      errorMessage = 'AI service is not responding';
-      statusCode = 503;
-    } else if (error.message.includes('network') || error.message.includes('ENOTFOUND')) {
-      errorMessage = 'Network error connecting to AI service';
-      statusCode = 503;
-    } else if (error.code === 'ECONNREFUSED') {
-      errorMessage = 'Unable to connect to AI service';
-      statusCode = 503;
-    } else if (error.message.includes('model') && error.message.includes('decommissioned')) {
-      errorMessage = 'AI model is no longer supported. Please update the application.';
-      statusCode = 500;
-    }
-    
-    res.status(statusCode).json({ 
-      message: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
 // Admin: Update product
 // Update product route
 app.put('/api/admin/products/:productId', authenticateToken, isAdmin, async (req, res) => {
@@ -2426,7 +1663,6 @@ app.put('/api/addresses/:addressId', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error updating address' });
   }
 });
-
 // Update delivery location (for delivery personnel app)
 app.post('/api/orders/:orderId/location', authenticateToken, async (req, res) => {
   try {

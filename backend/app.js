@@ -596,6 +596,13 @@ app.post('/api/products/:productId/reviews', authenticateToken, async (req, res)
         sentimentData.confidence
       ]
     );
+    try {
+  await axios.post(`${SENTIMENT_API_URL}/clear-cache/${userId}/review`, {}, {
+    timeout: 5000
+  });
+} catch (error) {
+  console.error('Cache clearing error after review:', error);
+}
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -880,6 +887,8 @@ app.post('/products/:productId/reviews', async (req, res) => {
   }
 });
 
+
+
 app.post('/analyze-sentiment', async (req, res) => {
   try {
       const { text, rating } = req.body;
@@ -1056,6 +1065,7 @@ app.post('/api/reviews/:reviewId/helpful', authenticateToken, async (req, res) =
   }
 });
 
+
 // Update product routes to include average rating
 app.get('/api/products/category/:categoryId', async (req, res) => {
   try {
@@ -1203,6 +1213,13 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
       await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
       
       await client.query('COMMIT');
+      try {
+        await axios.post(`${SENTIMENT_API_URL}/clear-cache/${req.user.userId}/order`, {}, {
+          timeout: 5000
+        });
+      } catch (error) {
+        console.error('Cache clearing error after order:', error);
+      }
       
       res.status(201).json({
         message: 'Order placed successfully',
@@ -1608,6 +1625,13 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
         Boolean(is_featured)
       ]
     );
+    try {
+      // Clear trending/best-selling caches since new product affects these
+      await axios.post(`${SENTIMENT_API_URL}/clear-cache/all`);
+      console.log('Cleared all recommendation caches after new product creation');
+    } catch (cacheError) {
+      console.error('Cache clear error:', cacheError);
+    }
 
     res.status(201).json({
       message: 'Product added successfully',
@@ -1878,7 +1902,12 @@ app.put('/api/admin/products/:productId', authenticateToken, isAdmin, async (req
         productId
       ]
     );
-    
+    try {
+      await axios.post(`${SENTIMENT_API_URL}/clear-cache/product/${productId}`);
+      console.log(`Cleared cache for updated product ${productId}`);
+    } catch (cacheError) {
+      console.error('Cache clear error:', cacheError);
+    }
     res.json({ message: 'Product updated successfully' });
   } catch (error) {
     console.error('Product update error:', error);
@@ -1894,6 +1923,12 @@ app.delete('/api/admin/products/:productId', authenticateToken, isAdmin, async (
   try {
     const { productId } = req.params;
     await pool.query('DELETE FROM products WHERE product_id = $1', [productId]);
+    try {
+      await axios.post(`${SENTIMENT_API_URL}/clear-cache/product/${productId}`);
+      console.log(`Cleared cache for deleted product ${productId}`);
+    } catch (cacheError) {
+      console.error('Cache clear error:', cacheError);
+    }
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     console.error('Product deletion error:', error);
@@ -1901,6 +1936,109 @@ app.delete('/api/admin/products/:productId', authenticateToken, isAdmin, async (
   }
 });
 
+app.get('/api/admin/recommendations', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    // Get basic data from your database
+    const baseQuery = `
+      SELECT 
+        user_id,
+        user_name,
+        product_id,
+        source_product_name,
+        source_rating,
+        created_at,
+        recommendation_type
+      FROM (
+        -- Users with recent reviews (filter out negative reviews)
+        SELECT 
+          r.user_id,
+          u.name as user_name,
+          r.product_id,
+          p.name as source_product_name,
+          r.rating as source_rating,
+          r.created_at,
+          'review' as recommendation_type
+        FROM reviews r
+        JOIN users u ON r.user_id = u.user_id
+        JOIN products p ON r.product_id = p.product_id
+        WHERE r.created_at >= NOW() - INTERVAL '30 days'
+          AND NOT (r.rating < 3 AND COALESCE(r.sentiment_score, 5.0) < 5.0)
+        
+        UNION ALL
+        
+        -- Users with recent purchases (no review)
+        SELECT DISTINCT
+          o.user_id,
+          u.name as user_name,
+          oi.product_id,
+          p.name as source_product_name,
+          NULL::INTEGER as source_rating,
+          o.created_at,
+          'purchase' as recommendation_type
+        FROM orders o
+        JOIN users u ON o.user_id = u.user_id
+        JOIN order_items oi ON o.order_id = oi.order_id
+        JOIN products p ON oi.product_id = p.product_id
+        WHERE o.created_at >= NOW() - INTERVAL '30 days'
+          AND NOT EXISTS (
+            SELECT 1 FROM reviews r 
+            WHERE r.user_id = o.user_id 
+            AND r.product_id = oi.product_id
+            AND r.created_at >= o.created_at - INTERVAL '7 days'
+          )
+      ) AS combined_data
+      ORDER BY created_at DESC
+      LIMIT 25
+    `;
+
+    
+    const result = await pool.query(baseQuery);
+    
+    // For each user, get personalized recommendations from your sentiment service
+    const recommendationsPromises = result.rows.map(async (row) => {
+      try {
+        // Include product_id in the request
+        const response = await axios.get(
+          `http://localhost:5001/recommendations/${row.user_id}?limit=3&product_id=${row.product_id}`
+        );
+        
+        const recData = response.data;
+        
+        return {
+          user_name: row.user_name,
+          recommendation_type: row.recommendation_type,
+          source_product_name: row.source_product_name,
+          source_rating: row.source_rating || 'N/A',
+          source_order_id: null,
+          recommended_products: recData.recommendations?.products?.slice(0, 3).map(p => p.name).join(', ') || 'No recommendations',
+          confidence_score: recData.recommendations?.confidence || 0.7,
+          created_at: row.created_at,
+          // Add trigger product ID for debugging
+          trigger_product_id: row.product_id
+        };
+      } catch (error) {
+        console.error(`Error getting recommendations for user ${row.user_id}:`, error);
+        return {
+          user_name: row.user_name,
+          recommendation_type: row.recommendation_type,
+          source_product_name: row.source_product_name,
+          source_rating: row.source_rating || 'N/A',
+          source_order_id: null,
+          recommended_products: 'No recommendations available',
+          confidence_score: 0.0,
+          created_at: row.created_at
+        };
+      }
+    });
+    
+    const recommendations = await Promise.all(recommendationsPromises);
+    res.json(recommendations);
+    
+  } catch (error) {
+    console.error('Error fetching recommendations:', error);
+    res.status(500).json({ message: 'Server error fetching recommendations' });
+  }
+});
 // Admin: Get all orders
 app.get('/api/admin/orders', authenticateToken, isAdmin, async (req, res) => {
   try {

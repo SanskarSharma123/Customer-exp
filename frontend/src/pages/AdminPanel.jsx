@@ -15,6 +15,7 @@ const AdminPanel = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [personnel, setPersonnel] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
   
   
   const [newPersonnel, setNewPersonnel] = useState({
@@ -56,22 +57,24 @@ const [suggestions, setSuggestions] = useState(null);
           return;
         }
 
-        const [productsRes, ordersRes, usersRes, categoriesRes, personnelRes, reviewsRes] = await Promise.all([
+       const [productsRes, ordersRes, usersRes, categoriesRes, personnelRes, reviewsRes, recommendationsRes] = await Promise.all([
   fetch(`${apiUrl}/admin/products`, { credentials: "include" }),
   fetch(`${apiUrl}/admin/orders`, { credentials: "include" }),
   fetch(`${apiUrl}/admin/users`, { credentials: "include" }),
   fetch(`${apiUrl}/categories`),
   fetch(`${apiUrl}/admin/delivery-personnel`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/reviews`, { credentials: "include" })
+  fetch(`${apiUrl}/admin/reviews`, { credentials: "include" }),
+  fetch(`${apiUrl}/admin/recommendations`, { credentials: "include" })
 ]);
 
-        const [productsData, ordersData, usersData, categoriesData, personnelData, reviewsData] = await Promise.all([
+        const [productsData, ordersData, usersData, categoriesData, personnelData, reviewsData, recommendationsData] = await Promise.all([
           productsRes.json(),
           ordersRes.json(),
           usersRes.json(),
           categoriesRes.json(),
           personnelRes.json(),
-          reviewsRes.json()
+          reviewsRes.json(),
+          recommendationsRes.json()
         ]);
 
         setProducts(productsData);
@@ -81,6 +84,7 @@ const [suggestions, setSuggestions] = useState(null);
         setPersonnel(personnelData);
         setReviews(reviewsData);
         setLoading(false);
+        setRecommendations(Array.isArray(recommendationsData) ? recommendationsData : []);
 
       } catch (error) {
         console.error('Admin panel error:', error);
@@ -443,7 +447,8 @@ const applySuggestions = () => {
     orders: '📋',
     users: '👥',
     personnel: '🚚',
-    reviews: '⭐'
+    reviews: '⭐',
+    recommendations: '🎯'
   };
   return icons[tab] || '';
 };
@@ -454,7 +459,8 @@ const applySuggestions = () => {
     orders: Array.isArray(orders) ? orders.length : 0,
     users: Array.isArray(users) ? users.length : 0,
     personnel: Array.isArray(personnel) ? personnel.length : 0,
-    reviews: Array.isArray(reviews) ? reviews.length : 0
+    reviews: Array.isArray(reviews) ? reviews.length : 0,
+    recommendations: Array.isArray(recommendations) ? recommendations.length : 0
   };
   return counts[tab] || 0;
 };
@@ -467,7 +473,7 @@ const applySuggestions = () => {
       <div className="admin-sidebar">
         <h2>🎛️ Admin Panel</h2>
         <ul>
-         {["products", "orders", "users", "personnel", "reviews"].map(tab => (
+         {["products", "orders", "users", "personnel", "reviews", "recommendations"].map(tab => (
             <li
               key={tab}
               className={activeTab === tab ? "active" : ""}
@@ -1164,6 +1170,92 @@ const applySuggestions = () => {
               </div>
             </td>
             <td>{new Date(review.created_at).toLocaleDateString()}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+{/* Recommendations Tab */}
+{activeTab === "recommendations" && (
+  <div className="recommendations-admin">
+    <h2>🎯 Product Recommendations</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Based On</th>
+          <th>Source Item</th>
+          <th>Recommended Products</th>
+          <th>Confidence</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Array.isArray(recommendations) && recommendations.map((rec) => (
+          <tr key={rec.recommendation_id}>
+            <td>
+              <div style={{ fontWeight: '600' }}>
+                👤 {rec.user_name}
+              </div>
+            </td>
+            <td>
+              <span style={{
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                background: rec.recommendation_type === 'review' ? 'var(--primary-gradient)' : 'var(--success-color)',
+                color: 'white'
+              }}>
+                {rec.recommendation_type === 'review' ? '⭐ Review' : '🛒 Purchase'}
+              </span>
+            </td>
+            <td>
+              <div>
+                <div style={{ fontWeight: '600' }}>{rec.source_product_name}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+  {rec.recommendation_type === 'review' ? 
+    `${rec.source_rating}⭐ rating` : 
+    rec.source_order_id ? `Order #${rec.source_order_id}` : ''
+  }
+</div>
+              </div>
+            </td>
+            <td>
+              <div style={{ maxWidth: '200px' }}>
+                {rec.recommended_products?.split(',').map((product, idx) => (
+                  <span key={idx} style={{
+                    display: 'inline-block',
+                    margin: '2px',
+                    padding: '2px 6px',
+                    background: 'var(--border-color)',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}>
+                    {product.trim()}
+                  </span>
+                ))}
+              </div>
+            </td>
+            <td>
+              <div style={{
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600',
+                background: rec.confidence_score > 0.7 ? 'var(--success-color)' : 
+                           rec.confidence_score > 0.5 ? 'var(--warning-color)' : 'var(--error-color)',
+                color: 'white'
+              }}>
+                {Math.round(rec.confidence_score * 100)}%
+              </div>
+            </td>
+            <td>
+              <div style={{ fontSize: '14px' }}>
+                📅 {new Date(rec.created_at).toLocaleDateString()}
+              </div>
+            </td>
           </tr>
         ))}
       </tbody>

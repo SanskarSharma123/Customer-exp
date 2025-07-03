@@ -8,6 +8,7 @@ from flask_cors import CORS
 import logging
 from datetime import datetime, timedelta
 import json
+import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -87,7 +88,14 @@ class EnhancedRecommendationSystem:
         self.product_cache = {}
         self.user_cache = {}
         self.cache_ttl = 300  # 5 minutes
-        
+        self.event_cache = {}
+        self.event_cache_ttl = 300 
+    # In app.py, add to EnhancedRecommendationSystem class
+    def clear_user_cache(self, user_id):
+        cache_key = f"user_profile_{user_id}"
+        if cache_key in self.user_cache:
+            del self.user_cache[cache_key]
+            logger.info(f"Cleared cache for user {user_id}")    
     def connect_db(self):
         """Create database connection with better error handling"""
         try:
@@ -437,6 +445,140 @@ class EnhancedRecommendationSystem:
             logger.error(f"Error fetching trending products: {e}")
             return []
     
+    def get_event_based_recommendations(self, user_id, product_id, limit=3):
+        """Get recommendations based on specific product interaction"""
+        cache_key = f"event_rec_{user_id}_{product_id}_{limit}"
+        current_time = time.time()
+        
+        # Check cache
+        if cache_key in self.event_cache:
+            cached_result, timestamp = self.event_cache[cache_key]
+            if current_time - timestamp < self.event_cache_ttl:
+                logger.info(f"Returning cached event-based recommendations for {cache_key}")
+                return cached_result
+        try:
+            # Get the product details
+            product = self.get_product_details(product_id)
+            if not product:
+                return self.get_personalized_recommendations(user_id, limit)
+
+            # Get user profile and preferences
+            user_profile = self.get_user_profile(user_id)
+            prefs = user_profile['preferences'] if user_profile and user_profile.get('preferences') else None
+            
+            # Get products in the same category
+            same_category = self.get_category_based_recommendations(user_id, product['category_id'], limit*3)
+            
+            # Get personalized recommendations as fallback
+            personalized = self.get_personalized_recommendations(user_id, limit*2)['products']
+            
+            # Combine and deduplicate
+            candidates = []
+            seen_ids = set()
+            
+            # Add same-category products first
+            for p in same_category:
+                if p['product_id'] != product_id and p['product_id'] not in seen_ids:
+                    candidates.append(p)
+                    seen_ids.add(p['product_id'])
+            
+            # Add personalized recommendations if needed
+            if len(candidates) < limit:
+                for p in personalized:
+                    if p['product_id'] != product_id and p['product_id'] not in seen_ids:
+                        candidates.append(p)
+                        seen_ids.add(p['product_id'])
+            
+            # Score and sort by relevance
+            scored = []
+            for candidate in candidates:
+                score = 0
+                
+                # Category match score (40%)
+                if candidate['category_id'] == product['category_id']:
+                    score += 0.4
+                
+                # Price similarity (30%)
+                try:
+                    product_price = float(product['discount_price'] or product['price'])
+                    candidate_price = float(candidate['discount_price'] or candidate['price'])
+                    price_diff = abs(product_price - candidate_price)
+                    price_score = 1 / (1 + price_diff/max(1, product_price))
+                    score += price_score * 0.3
+                except:
+                    score += 0.15
+                
+                # User preference score (30%)
+                if prefs:
+                    # Category preference
+                    cat_pref = prefs['categories'].get(candidate['category_id'], 0)
+                    score += cat_pref * 0.2
+                    
+                    # Sentiment alignment
+                    try:
+                        sent_diff = abs(float(candidate.get('sentiment_score', 5)) - 
+                                    float(prefs['sentiment_profile']['avg_sentiment']))
+                        sent_score = 1 - (sent_diff / 10.0)
+                        score += sent_score * 0.1
+                    except:
+                        pass
+                
+                scored.append((candidate, score))
+            
+            # Sort by score and select top
+            scored.sort(key=lambda x: x[1], reverse=True)
+            top_products = [p for p, score in scored[:limit]]
+            
+            return {
+                'type': 'event_based',
+                'products': top_products,
+                'message': f'Recommendations based on your interaction with {product["name"]}',
+                'confidence': 0.85,
+                'trigger_product': product_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Event-based recommendation failed: {e}")
+            # Fallback to personalized recommendations
+            return self.get_personalized_recommendations(user_id, limit)
+
+    def clear_event_cache(self, user_id=None, product_id=None):
+        """Clear event-based recommendation cache"""
+        if user_id is None and product_id is None:
+            self.event_cache = {}
+            logger.info("Cleared entire event recommendation cache")
+            return
+        
+        keys_to_delete = []
+        for key in list(self.event_cache.keys()):
+            # Key format: "event_rec_{user_id}_{product_id}_{limit}"
+            parts = key.split('_')
+            if len(parts) >= 4:
+                key_user = int(parts[2])
+                key_product = int(parts[3])
+                
+                if user_id is not None and key_user == user_id:
+                    keys_to_delete.append(key)
+                elif product_id is not None and key_product == product_id:
+                    keys_to_delete.append(key)
+        
+        for key in keys_to_delete:
+            del self.event_cache[key]
+        
+        logger.info(f"Cleared {len(keys_to_delete)} event cache entries for user={user_id}, product={product_id}")
+
+    def get_product_details(self, product_id):
+        """Get basic product details"""
+        try:
+            with self.connect_db() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = "SELECT * FROM products WHERE product_id = %s"
+                    cur.execute(query, (product_id,))
+                    return cur.fetchone()
+        except Exception as e:
+            logger.error(f"Error fetching product {product_id}: {e}")
+            return None
+
     def get_personalized_recommendations(self, user_id, limit=20):
         """Generate highly personalized recommendations using multiple algorithms"""
         user_profile = self.get_user_profile(user_id)
@@ -1119,27 +1261,33 @@ rec_system = EnhancedRecommendationSystem(DB_CONFIG)
 def get_recommendations(user_id):
     """Get personalized recommendations for a user"""
     try:
+        product_id = request.args.get('product_id', type=int)
         limit = int(request.args.get('limit', 20))
         rec_type = request.args.get('type', 'personalized')
-        
-        if rec_type == 'trending':
-            products = rec_system.get_trending_products(limit)
-            result = {
-                'type': 'trending',
-                'products': products,
-                'message': 'Currently trending products',
-                'confidence': 0.8
-            }
-        elif rec_type == 'seasonal':
-            products = rec_system.get_seasonal_recommendations(user_id, limit)
-            result = {
-                'type': 'seasonal',
-                'products': products,
-                'message': 'Seasonal recommendations for you',
-                'confidence': 0.7
-            }
+        if product_id:
+            # Get event-based recommendations
+            result = rec_system.get_event_based_recommendations(user_id, product_id, limit)
         else:
-            result = rec_system.get_personalized_recommendations(user_id, limit)
+            if rec_type == 'trending':
+                products = rec_system.get_trending_products(limit)
+                result = {
+                    'type': 'trending',
+                    'products': products,
+                    'message': 'Currently trending products',
+                    'confidence': 0.8
+                }
+            elif rec_type == 'seasonal':
+                products = rec_system.get_seasonal_recommendations(user_id, limit)
+                result = {
+                    'type': 'seasonal',
+                    'products': products,
+                    'message': 'Seasonal recommendations for you',
+                    'confidence': 0.7
+                }
+            else:
+                result = rec_system.get_personalized_recommendations(user_id, limit)
+        
+        
         
         return jsonify({
             'success': True,
@@ -1152,7 +1300,52 @@ def get_recommendations(user_id):
             'success': False,
             'error': 'Failed to get recommendations'
         }), 500
+@app.route('/clear-cache/<int:user_id>/order', methods=['POST'])
+def clear_cache_after_order(user_id):
+    """Clear user cache after order placement"""
+    try:
+        rec_system.clear_user_cache(user_id)
+        # Also clear any product-related caches if needed
+        rec_system.product_cache.clear()  # Clear product cache too
+        return jsonify({
+            'success': True,
+            'message': f'Cache cleared for user {user_id} after order'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
+@app.route('/clear-cache/<int:user_id>/review', methods=['POST'])
+def clear_cache_after_review(user_id):
+    """Clear user cache after review submission"""
+    try:
+        rec_system.clear_user_cache(user_id)
+        return jsonify({
+            'success': True,
+            'message': f'Cache cleared for user {user_id} after review'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/clear-cache/product/<int:product_id>', methods=['POST'])
+def clear_cache_for_product(product_id):
+    """Clear cache when product information changes"""
+    try:
+        rec_system.clear_event_cache(product_id=product_id)
+        return jsonify({
+            'success': True,
+            'message': f'Cache cleared for product {product_id}'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 @app.route('/recommendations/<int:user_id>/category/<int:category_id>', methods=['GET'])
 def get_category_recommendations(user_id, category_id):
     """Get recommendations for a specific category"""

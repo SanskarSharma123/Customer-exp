@@ -185,6 +185,7 @@ app.post('/api/login', async (req, res) => {
       message: 'Login successful',
       user: {
         id: user.user_id,
+        token: token,
         name: user.name,
         email: user.email,
         isAdmin: user.is_admin

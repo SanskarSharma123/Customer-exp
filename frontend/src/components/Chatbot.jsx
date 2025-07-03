@@ -1,9 +1,14 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, Routes,Route } from 'react';
 import '../css/Chatbot.css';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from "../contexts/ThemeContext";
+import Cart from '../pages/Cart';
 
+<Routes>
+  {/* other routes */}
+  <Route path="/cart" element={<Cart />} />
+</Routes>
 const Chatbot = () => {
 
   const { toggleDarkMode } = useTheme();
@@ -358,6 +363,10 @@ else if (res.data.action === "greet") {
       else if (res.data.action === "product_details_failed") {
         addBotMessage("Unable to fetch product details. Please try again.");
       }
+      else if (res.data.action === "order_notification_sent") {
+        addBotMessage("Order placed successfully");
+      }
+
       else if (res.data.action === "order_success") {
         addBotMessage(res.data.response);
         localStorage.setItem("cart_updated", Date.now());
@@ -371,7 +380,10 @@ else if (res.data.action === "greet") {
       else if (res.data.action === "unauthenticated") {
         addBotMessage(res.data.response);
       }
-
+      else if (res.data.action === "cart_navigate") {
+          addBotMessage(res.data.response || "Navigating to your cart...");
+          navigate("/cart");
+      }
 
       else if (res.data.response) {
         addBotMessage(res.data.response);

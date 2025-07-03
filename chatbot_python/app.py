@@ -1,14 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from intent_service import classify_intent
 from prompt.get_category import get_category_prompt
 from prompt.get_category_min_max import get_category_min_max
+from prompt.order_details import get_order_details_prompt
 from prompt.get_product_id_prompt import get_productid_quantity
 from langchain_ollama import OllamaLLM
 import requests
 import json
+import asyncio
+import logging
 
+model = OllamaLLM(model="gemma3:latest")
 
 # Import intent handlers
 from handlers.category_min_max_browsing import handle_category_min_max_browsing
@@ -31,9 +35,13 @@ from handlers.wishlist_management import handle_wishlist_management
 from handlers.product_recommendation import handle_product_recommendation
 from handlers.review_ratings import handle_review_ratings
 from handlers.faqs import handle_faqs
-
 from handlers.greet import handle_greet
 from handlers.goodbye import handle_goodbye
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 categories = [
                     'Fruits & Vegetables', 'Dairy & Eggs', 'Bakery', 'Snacks & Beverages', 'Household',
                     'Meat & Seafood', 'Frozen Foods', 'Personal Care', 'Baby Products', 'Pet Supplies',
@@ -52,15 +60,152 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-model = OllamaLLM(model="gemma3:latest")
-
 class Query(BaseModel):
     message: str
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+        self.user_connections: dict[str, WebSocket] = {}  # Map user tokens to websockets
 
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
 
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        
+        # Remove from user connections if it exists
+        user_token_to_remove = None
+        for token, ws in self.user_connections.items():
+            if ws == websocket:
+                user_token_to_remove = token
+                break
+        
+        if user_token_to_remove:
+            del self.user_connections[user_token_to_remove]
+            logger.info(f"Removed authenticated user: {user_token_to_remove[:20]}...")
+        
+        logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+
+    async def send_personal_message(self, message: dict, user_token: str):
+        """Send message to a specific user"""
+        logger.info(f"Attempting to send message to user: {user_token[:20]}...")
+        logger.info(f"Available authenticated connections: {len(self.user_connections)}")
+        
+        if user_token in self.user_connections:
+            try:
+                websocket = self.user_connections[user_token]
+                await websocket.send_json(message)
+                logger.info(f"✅ Message sent successfully to user: {user_token[:20]}...")
+                return True
+            except Exception as e:
+                logger.error(f"❌ Failed to send message to user {user_token[:20]}...: {e}")
+                # Remove the broken connection
+                del self.user_connections[user_token]
+                return False
+        else:
+            logger.warning(f"❌ User {user_token[:20]}... not found in authenticated connections")
+            logger.info(f"Available tokens: {[token[:20] + '...' for token in self.user_connections.keys()]}")
+            return False
+
+    async def broadcast(self, message: dict):
+        """Send message to all connected clients"""
+        logger.info(f"Broadcasting message to {len(self.active_connections)} connections")
+        disconnected = []
+        successful_sends = 0
+        
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+                successful_sends += 1
+            except Exception as e:
+                logger.error(f"Failed to send broadcast message: {e}")
+                disconnected.append(connection)
+        
+        # Remove disconnected clients
+        for connection in disconnected:
+            self.active_connections.remove(connection)
+        
+        logger.info(f"Broadcast completed: {successful_sends} successful, {len(disconnected)} failed")
+
+manager = ConnectionManager()
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    logger.info("New WebSocket connection established")
+    
+    try:
+        while True:
+            # Listen for messages from the client
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                message_type = message.get("type")
+                logger.info(f"Received WebSocket message: {message_type}")
+                
+                if message_type == "ping":
+                    # Respond to ping with pong
+                    await websocket.send_json({"type": "pong"})
+                elif message_type == "auth":
+                    # Handle authentication
+                    user_token = message.get("token")
+                    if user_token:
+                        # Store the authenticated connection
+                        manager.user_connections[user_token] = websocket
+                        await websocket.send_json({"type": "auth_success", "message": "Authentication successful"})
+                        logger.info(f"✅ User authenticated via WebSocket: {user_token[:20]}...")
+                        logger.info(f"Total authenticated connections: {len(manager.user_connections)}")
+                    else:
+                        await websocket.send_json({"type": "auth_failed", "message": "Token missing"})
+                        logger.warning("❌ WebSocket authentication failed - no token provided")
+                else:
+                    logger.info(f"Received unknown message type: {message_type}")
+                    
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON received from client")
+                await websocket.send_json({"type": "error", "message": "Invalid JSON format"})
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        logger.info("WebSocket disconnected normally")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
+
+async def notify_place_order(user_token: str = None):
+    """Notify specific user or all users about order placement"""
+    message = {
+        "action": "place_order",
+        "payment": "cod",
+        "message": "Please proceed to place your order",
+        "timestamp": asyncio.get_event_loop().time()
+    }
+    
+    if user_token:
+        logger.info(f"🚀 Sending place order notification to specific user: {user_token[:20]}...")
+        logger.info(f"Available authenticated connections: {len(manager.user_connections)}")
+        logger.info(f"Available tokens: {[token[:20] + '...' for token in manager.user_connections.keys()]}")
+        
+        success = await manager.send_personal_message(message, user_token)
+        if success:
+            logger.info(f"✅ Order notification sent successfully to user: {user_token[:20]}...")
+            return True
+        else:
+            logger.warning(f"❌ Failed to send order notification to user: {user_token[:20]}...")
+            logger.info("🔄 Attempting broadcast as fallback...")
+            await manager.broadcast(message)
+            logger.info("📢 Order notification broadcasted as fallback")
+            return False
+    else:
+        logger.info("📢 Broadcasting order notification to all users...")
+        await manager.broadcast(message)
+        logger.info("📢 Order notification broadcasted to all users")
+        return True
+    
 @app.post("/api/intent")
-def detect_intent(query: Query, request: Request):
+async def detect_intent(query: Query, request: Request):
     token = request.cookies.get("token")
 
     if not token:
@@ -264,10 +409,36 @@ def detect_intent(query: Query, request: Request):
             except Exception as e:
                 print("Product details fetch error:", e)
                 return {"action": "product_details_failed", "message": "Server error"}
+            
+    elif intent == "cart_navigate":
+        return {"action": "cart_navigate", "response": "Navigating to your cart..."}
 
 
-    elif intent == "product_details":
-        result = handle_product_details(query.message)
+    elif intent == "place_order":
+        try:
+            # logger.info(f"Processing place_order intent for token: {token[:20]}...")
+            
+            # Send WebSocket notification
+            notification_success = await notify_place_order(token)
+            
+            # Always return success response, even if WebSocket fails
+            return {
+                "action": "order_initiated",
+                "payment": "cod",
+                "response": "Order process initiated.",
+                "message": "Your order placement has been triggered. Please complete the process in your cart.",
+                "websocket_success": notification_success
+            }
+                
+        except Exception as e:
+            logger.error(f"Error in place_order intent: {e}")
+            return {
+                "action": "order_initiated",
+                "response": "Order process initiated. .",
+                "message": "Please complete the order process in your cart.",
+                "error": str(e)
+            }
+ 
     elif intent == "price_filter":
         result = handle_price_filter(query.message)
     elif intent == "offers_discounts":

@@ -17,7 +17,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://127.0.0.1:8000'],
   credentials: true
 }));
 
@@ -26,9 +26,9 @@ const SENTIMENT_API_URL = process.env.SENTIMENT_API_URL || "http://localhost:500
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'postgres2',
-  password: process.env.DB_PASSWORD || 'hatebitches1',
-  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'database4',
+  password: process.env.DB_PASSWORD || 'Helloace@135',
+  port: process.env.DB_PORT || 5433,
 });
 
 // Secret key for JWT
@@ -224,6 +224,7 @@ app.post('/api/login', async (req, res) => {
     
     res.json({
       message: 'Login successful',
+      token: token,
       user: {
         id: user.user_id,
         name: user.name,
@@ -1102,6 +1103,150 @@ app.get('/api/products/:productId', async (req, res) => {
       res.status(500).json({ message: 'Server error fetching product' });
   }
 });
+// app.post('/api/orders', authenticateToken, async (req, res) => {
+//   console.log('🔍 ==> Order request received');
+//   console.log('🔍 User:', req.user);
+//   console.log('🔍 Body:', req.body);
+//   console.log('🔍 Headers:', req.headers);
+  
+//   try {
+//     let { addressId, paymentMethod } = req.body;
+    
+//     addressId = parseInt(addressId);
+    
+//     // Validate required fields
+//     if (!addressId) {
+//       console.log('❌ Missing addressId');
+//       return res.status(400).json({ message: 'Address ID is required' });
+//     }
+    
+//     if (!paymentMethod) {
+//       console.log('❌ Missing paymentMethod');
+//       return res.status(400).json({ message: 'Payment method is required' });
+//     }
+    
+//     const client = await pool.connect();
+    
+//     try {
+//       await client.query('BEGIN');
+      
+//       // Get user's cart
+//       console.log('🔍 Fetching cart for user:', req.user.userId);
+//       const carts = await client.query(
+//         'SELECT * FROM cart WHERE user_id = $1',
+//         [req.user.userId]
+//       );
+      
+//       console.log('🔍 Cart results:', carts.rows.length);
+      
+//       if (carts.rows.length === 0) {
+//         console.log('❌ Cart is empty');
+//         await client.query('ROLLBACK');
+//         return res.status(400).json({ message: 'Cart is empty' });
+//       }
+
+      
+//       const cartId = carts.rows[0].cart_id;
+      
+//       // Get cart items with product details
+//       const items = await client.query(
+//         `SELECT ci.quantity, p.product_id, p.price, p.discount_price 
+//          FROM cart_items ci
+//          JOIN products p ON ci.product_id = p.product_id
+//          WHERE ci.cart_id = $1`,
+//         [cartId]
+//       );
+      
+//       if (items.rows.length === 0) {
+//         await client.query('ROLLBACK');
+//         return res.status(400).json({ message: 'Cart is empty' });
+//       }
+      
+//       // Calculate total amount
+//       let totalAmount = 0;
+//       items.rows.forEach(item => {
+//         const price = item.discount_price || item.price;
+//         totalAmount += price * item.quantity;
+//       });
+      
+//       // Apply delivery fee if total is less than 500
+//       const deliveryFee = totalAmount < 500 ? 20.00 : 0.00;
+//       totalAmount += deliveryFee;
+      
+//       // Create order with delivery time estimate (10-15 minutes)
+//       const estimatedDeliveryTime = new Date(Date.now() + 15 * 60000); // 15 minutes from now
+      
+//       const orderResult = await client.query(
+//         `INSERT INTO orders (user_id, address_id, total_amount, delivery_fee, status, 
+//          payment_method, payment_status, estimated_delivery_time)
+//          VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7) RETURNING order_id`,
+//         [req.user.userId, addressId, totalAmount, deliveryFee, paymentMethod, 
+//          paymentMethod === 'cash_on_delivery' ? 'pending' : 'completed', 
+//          estimatedDeliveryTime]
+//       );
+      
+//       const orderId = orderResult.rows[0].order_id;
+      
+//       // Add order items
+//       for (const item of items.rows) {
+//         const price = item.discount_price || item.price;
+//         await client.query(
+//           'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
+//           [orderId, item.product_id, item.quantity, price]
+//         );
+        
+//         // Update product stock
+//         await client.query(
+//           'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE product_id = $2',
+//           [item.quantity, item.product_id]
+//         );
+//       }
+      
+//       // Initialize order tracking
+//       await client.query(
+//         'INSERT INTO order_tracking (order_id, status, location) VALUES ($1, $2, $3)',
+//         [orderId, "pending", "Order received"]
+//       );
+      
+//       // Get address details to fetch latitude and longitude
+//       const addressResult = await client.query(
+//         'SELECT latitude, longitude FROM addresses WHERE address_id = $1',
+//         [addressId]
+//       );
+      
+//       console.log('🔍 Address Query Result:', addressResult.rows);
+//       if (addressResult.rows.length > 0) {
+//         const { latitude, longitude } = addressResult.rows[0];
+        
+//         // Add entry to delivery_locations table with user's address coordinates
+//         await client.query(
+//           'INSERT INTO delivery_locations (order_id, personnel_id, latitude, longitude) VALUES ($1, $2, $3, $4)',
+//           [orderId, 1, latitude, longitude]
+//         );
+//       }
+      
+//       // Clear the cart
+//       await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
+      
+//       await client.query('COMMIT');
+      
+//       res.status(201).json({
+//         message: 'Order placed successfully',
+//         orderId,
+//         estimatedDeliveryTime
+//       });
+//     } catch (error) {
+//       await client.query('ROLLBACK');
+//       throw error;
+//     } finally {
+//       client.release();
+//     }
+//   } catch (error) {
+//     console.error('Order creation error:', error);
+//     res.status(500).json({ message: 'Server error placing order' });
+//   }
+// });
+
 app.post('/api/orders', authenticateToken, async (req, res) => {
   try {
     const { addressId, paymentMethod } = req.body;

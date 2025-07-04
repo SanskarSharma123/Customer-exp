@@ -243,6 +243,11 @@ const ComparisonPage = () => {
             </div>
             <div className="product-overview-info">
               <h3 className="product-name">{product.name}</h3>
+              {product.subcategory_name && (
+                <div className="product-subcategory">
+                  <span className="subcategory-badge">{product.subcategory_name}</span>
+                </div>
+              )}
               <div className="product-pricing">
                 {product.discount_price ? (
                   <div className="price-container">
@@ -288,7 +293,11 @@ const ComparisonPage = () => {
             }
 
             return (
-              <div key={idx} className={`comparison-row ${isDifferent ? 'has-differences' : ''}`}>
+              <div 
+                key={idx} 
+                className={`comparison-row ${isDifferent ? 'has-differences' : ''}`}
+                data-attribute={attr.name.toLowerCase()}
+              >
                 <div className="attribute-name">
                   <span className="attribute-label">{attr.name}</span>
                   {isDifferent && <span className="difference-indicator">•</span>}

@@ -6,7 +6,14 @@ CREATE TABLE IF NOT EXISTS subcategories (
     category_id INTEGER NOT NULL REFERENCES categories(category_id),
     name VARCHAR(100) NOT NULL
 );
-
+-- 2. Create product-subcategory mapping table
+CREATE TABLE IF NOT EXISTS product_subcategories (
+    mapping_id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    subcategory_id INTEGER NOT NULL REFERENCES subcategories(subcategory_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, subcategory_id)
+);
 -- 2. Add subcategory_id to products
 ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory_id INTEGER REFERENCES subcategories(subcategory_id);
 
@@ -480,3 +487,12 @@ UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories W
 WHERE category_id = 27 AND name ILIKE ANY (ARRAY['%camera%', '%dash cam%', '%gps%', '%bluetooth%', '%speaker%', '%led%', '%light%', '%gadget%']);
 UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 27 AND name = 'Other Automotive')
 WHERE category_id = 27 AND subcategory_id IS NULL; 
+
+-- 3. Migrate existing subcategory assignments from products table to mapping table
+INSERT INTO product_subcategories (product_id, subcategory_id)
+SELECT product_id, subcategory_id
+FROM products
+WHERE subcategory_id IS NOT NULL;
+
+-- 4. Remove the subcategory_id column from products table
+ALTER TABLE products DROP COLUMN subcategory_id;

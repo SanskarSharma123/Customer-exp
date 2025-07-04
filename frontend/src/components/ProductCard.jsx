@@ -48,6 +48,7 @@ const ProductCard = ({ product }) => {
       }
       // Subcategory logic
       compareSubcategory = localStorage.getItem('compareSubcategory');
+      console.log('DEBUG: compareSubcategory:', compareSubcategory, 'product.subcategory_id:', product.subcategory_id);
       if (compareSubcategory && compareSubcategory !== String(product.subcategory_id)) {
         // Show confirm dialog
         setShowConfirm(true);

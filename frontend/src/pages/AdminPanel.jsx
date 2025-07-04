@@ -10,6 +10,7 @@ const AdminPanel = () => {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingProduct, setEditingProduct] = useState(null);
@@ -29,6 +30,7 @@ const AdminPanel = () => {
     price: 0,
     discount_price: 0,
     category_id: '',
+    subcategory_id: '',
     image_url: '',
     stock_quantity: 0,
     unit: 'pieces',
@@ -56,20 +58,22 @@ const [suggestions, setSuggestions] = useState(null);
           return;
         }
 
-        const [productsRes, ordersRes, usersRes, categoriesRes, personnelRes, reviewsRes] = await Promise.all([
-  fetch(`${apiUrl}/admin/products`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/orders`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/users`, { credentials: "include" }),
-  fetch(`${apiUrl}/categories`),
-  fetch(`${apiUrl}/admin/delivery-personnel`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/reviews`, { credentials: "include" })
-]);
+        const [productsRes, ordersRes, usersRes, categoriesRes, subcategoriesRes, personnelRes, reviewsRes] = await Promise.all([
+          fetch(`${apiUrl}/admin/products`, { credentials: "include" }),
+          fetch(`${apiUrl}/admin/orders`, { credentials: "include" }),
+          fetch(`${apiUrl}/admin/users`, { credentials: "include" }),
+          fetch(`${apiUrl}/categories`),
+          fetch(`${apiUrl}/subcategories`),
+          fetch(`${apiUrl}/admin/delivery-personnel`, { credentials: "include" }),
+          fetch(`${apiUrl}/admin/reviews`, { credentials: "include" })
+        ]);
 
-        const [productsData, ordersData, usersData, categoriesData, personnelData, reviewsData] = await Promise.all([
+        const [productsData, ordersData, usersData, categoriesData, subcategoriesData, personnelData, reviewsData] = await Promise.all([
           productsRes.json(),
           ordersRes.json(),
           usersRes.json(),
           categoriesRes.json(),
+          subcategoriesRes.json(),
           personnelRes.json(),
           reviewsRes.json()
         ]);
@@ -78,6 +82,7 @@ const [suggestions, setSuggestions] = useState(null);
         setOrders(ordersData);
         setUsers(usersData);
         setCategories(categoriesData);
+        setSubcategories(subcategoriesData);
         setPersonnel(personnelData);
         setReviews(reviewsData);
         setLoading(false);
@@ -167,6 +172,7 @@ const generateProductSuggestions = async () => {
       description: data.description || `Quality ${productQuery.trim()} product`,
       price: parseFloat(data.price) || 100,
       category: data.category || 'General',
+      subcategory: data.subcategory || '',
       unit: data.unit || 'pieces',
       stock_quantity: parseInt(data.stock_quantity) || 10,
       image_url: data.image_url || ''
@@ -217,12 +223,16 @@ const applySuggestions = () => {
     cat.name.toLowerCase().includes(suggestions.category.toLowerCase()) ||
     suggestions.category.toLowerCase().includes(cat.name.toLowerCase())
   );
-  
+  const subcategoryMatch = subcategories.find(sub =>
+    sub.name.toLowerCase().includes(suggestions.subcategory?.toLowerCase() || '') &&
+    (!categoryMatch || sub.category_id === categoryMatch.category_id)
+  );
   const suggestionData = {
     name: suggestions.name || '',
     description: suggestions.description || '',
     price: suggestions.price || 0,
     category_id: categoryMatch?.category_id || '',
+    subcategory_id: subcategoryMatch?.subcategory_id || '',
     stock_quantity: suggestions.stock_quantity || 10,
     unit: suggestions.unit || 'pieces',
     image_url: suggestions.image_url || '',
@@ -582,6 +592,7 @@ const applySuggestions = () => {
         <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
           <strong>Name:</strong> {suggestions.name}<br/>
           <strong>Category:</strong> {suggestions.category}<br/>
+          <strong>Subcategory:</strong> {suggestions.subcategory}<br/>
           <strong>Price:</strong> ₹{suggestions.price}<br/>
           <strong>Description:</strong> {suggestions.description?.substring(0, 100)}...
         </div>
@@ -628,6 +639,23 @@ const applySuggestions = () => {
                         {category.name}
                       </option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label>📂 Subcategory</label>
+                  <select
+                    name="subcategory_id"
+                    value={editingProduct?.subcategory_id || newProduct.subcategory_id}
+                    onChange={handleProductChange}
+                  >
+                    <option value="">Select Subcategory</option>
+                    {subcategories
+                      .filter(sub => !newProduct.category_id || sub.category_id === newProduct.category_id)
+                      .map(subcategory => (
+                        <option key={subcategory.subcategory_id} value={subcategory.subcategory_id}>
+                          {subcategory.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>

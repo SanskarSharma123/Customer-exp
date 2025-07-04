@@ -176,10 +176,14 @@ app.get('/api/products', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
-      GROUP BY p.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `);
     res.json(products.rows);
   } catch (error) {
@@ -308,6 +312,37 @@ app.get('/api/categories', async (req, res) => {
   } catch (error) {
     console.error('Categories fetch error:', error);
     res.status(500).json({ message: 'Server error fetching categories' });
+  }
+});
+
+// Get all subcategories
+app.get('/api/subcategories', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, c.name as category_name 
+      FROM subcategories s 
+      JOIN categories c ON s.category_id = c.category_id 
+      ORDER BY c.name, s.name
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get subcategories by category
+app.get('/api/subcategories/:categoryId', async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const result = await pool.query(
+      'SELECT * FROM subcategories WHERE category_id = $1 ORDER BY name',
+      [categoryId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -604,7 +639,7 @@ app.post('/api/products/:productId/reviews', authenticateToken, async (req, res)
   }
 });
 
-// Comparion of products
+// Comparison of products
 app.get('/api/products/compare', async (req, res) => {
   try {
     const productIds = req.query.ids.split(',').map(id => parseInt(id.trim()));
@@ -617,11 +652,15 @@ app.get('/api/products/compare', async (req, res) => {
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
         COUNT(r.review_id) as review_count,
-        p.subcategory_id, p.category_id
+        ps.subcategory_id,
+        s.name as subcategory_name,
+        p.category_id
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
       WHERE p.product_id = ANY($1)
-      GROUP BY p.product_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `, [productIds]);
 
     if (products.rows.length !== 2) {
@@ -654,7 +693,21 @@ app.post('/api/products/similar-in-subcategories', async (req, res) => {
     // Exclude compared products from the results
     const excludeIds = Array.isArray(exclude_product_ids) ? exclude_product_ids : [];
     const products = await pool.query(
-      `SELECT * FROM products WHERE category_id = $1 AND subcategory_id = ANY($2) AND product_id != ALL($3) LIMIT 12`,
+      `SELECT p.*, 
+        COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
+      FROM products p
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+      WHERE p.category_id = $1 
+        AND ps.subcategory_id = ANY($2) 
+        AND p.product_id != ALL($3)
+      GROUP BY p.product_id, ps.subcategory_id, s.name
+      ORDER BY p.is_featured DESC, average_rating DESC, p.name
+      LIMIT 12`,
       [category_id, subcategory_ids, excludeIds.length ? excludeIds : [0]]
     );
     res.json(products.rows);
@@ -1552,7 +1605,15 @@ app.get('/api/admin/users', authenticateToken, isAdmin, async (req, res) => {
 app.get('/api/admin/products', authenticateToken, isAdmin, async (req, res) => {
   try {
     const products = await pool.query(`
-      SELECT * FROM products
+      SELECT p.*, 
+        ps.subcategory_id,
+        s.name as subcategory_name,
+        c.name as category_name
+      FROM products p
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      ORDER BY p.product_id DESC
     `);
     res.json(products.rows);
   } catch (error) {
@@ -1571,6 +1632,7 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
       price, 
       discount_price,  // Changed from discountPrice
       category_id,     // Changed from categoryId
+      subcategory_id,  // New field for subcategory
       image_url,       // Changed from imageUrl
       stock_quantity,  // Changed from stockQuantity
       unit, 
@@ -1590,30 +1652,55 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
       });
     }
 
-    const result = await pool.query(
-      `INSERT INTO products (
-        name, description, price, discount_price, 
-        category_id, image_url, stock_quantity, 
-        unit, is_featured
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
-       RETURNING product_id`,
-      [
-        name,
-        description,
-        parseFloat(price),
-        parseFloat(discount_price) || 0,
-        parseInt(category_id),
-        image_url,
-        parseInt(stock_quantity) || 0,
-        unit,
-        Boolean(is_featured)
-      ]
-    );
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    res.status(201).json({
-      message: 'Product added successfully',
-      productId: result.rows[0].product_id
-    });
+      // Insert product
+      const result = await client.query(
+        `INSERT INTO products (
+          name, description, price, discount_price, 
+          category_id, image_url, stock_quantity, 
+          unit, is_featured
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+         RETURNING product_id`,
+        [
+          name,
+          description,
+          parseFloat(price),
+          parseFloat(discount_price) || 0,
+          parseInt(category_id),
+          image_url,
+          parseInt(stock_quantity) || 0,
+          unit,
+          Boolean(is_featured)
+        ]
+      );
+
+      const productId = result.rows[0].product_id;
+
+      // If subcategory is provided, create the mapping
+      if (subcategory_id) {
+        await client.query(
+          `INSERT INTO product_subcategories (product_id, subcategory_id) 
+           VALUES ($1, $2)`,
+          [productId, parseInt(subcategory_id)]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        message: 'Product added successfully',
+        productId: productId
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Product creation error:', error);
     
@@ -1683,12 +1770,14 @@ Please respond with ONLY a valid JSON object containing exactly these fields:
   "description": "detailed product description (2-3 sentences)",
   "price": 25000,
   "category": "Electronics",
+  "subcategory": "Smartphones",
   "unit": "pieces",
   "stock_quantity": 10,
   "image_url": ""
 }
 
 Categories to choose from: Electronics, Fruits & Vegetables, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Snacks & Confectionery, Personal Care, Household Items, Books & Stationery, Sports & Fitness
+Subcategories to choose from: Apples & Exotic Fruits, Bananas & Citrus, Leafy Greens & Herbs, Root Vegetables, Gourds & Others ,Milk & Milk Drinks, Cheese & Paneer, Yogurt & Curd, Eggs, Ice Cream & Sweets, Breads,Savory Baked Goods, Chips & Namkeen, Chocolates & Sweets, Soft Drinks & Juices, Energy & Health Drinks, Cleaning Supplies, Air Fresheners & Insect Repellents, Laundry & Fabric Care, Kitchen & Household Accessories, Chicken, Fish & Seafood, Other Meat, Frozen Snacks, Frozen Vegetables & Fruits, Frozen Meat & Seafood, Frozen Desserts & Ice Cream, Soaps & Body Wash, Oral Care, Face Care, Shaving & Grooming, Other Baby Essentials, Dog Food & Treats, Other Pet Supplies, Cereals & Flakes, Ready to Eat Meals, Honey & Spreads, Condensed & Evaporated Milk, Herbal & Ayurvedic, Supplements & Others, Cookware & Bakeware, Home Essentials, Smartphones, Tablets, Televisions, Audio Devices, Other Electronics, PC Components, Smartwatches & Bands, Smart Speakers, Home Automation, Other Smart Devices, Consoles, Games, Washing Machines, Other Appliances, Men's Clothing, Women's Clothing, Unisex & Kids, Footwear & Accessories, Televisions, Streaming Devices, Other Entertainment, Books, Magazines & Newspapers, Music & Movies, Digital & Subscriptions, Footwear & Apparel, Accessories, Makeup, Skincare, Hair Care, Personal Hygiene, Beauty Tools, Cookware & Bakeware, Kitchen Appliances, Tableware & Storage, Home Essentials, Car Accessories, Car Care & Maintenance, Electronics & Gadgets, Other Automotive
 
 Important: 
 - Price should be in Indian Rupees (number only, no currency symbol)
@@ -1848,39 +1937,74 @@ app.put('/api/admin/products/:productId', authenticateToken, isAdmin, async (req
       price,
       discount_price,  // Changed from discountPrice
       category_id,     // Changed from categoryId
+      subcategory_id,  // New field for subcategory
       image_url,       // Changed from imageUrl
       stock_quantity,  // Changed from stockQuantity
       unit,
       is_featured      // Changed from isFeatured
     } = req.body;
 
-    await pool.query(
-      `UPDATE products SET 
-        name = $1, 
-        description = $2, 
-        price = $3, 
-        discount_price = $4,
-        category_id = $5, 
-        image_url = $6, 
-        stock_quantity = $7, 
-        unit = $8, 
-        is_featured = $9
-       WHERE product_id = $10`,
-      [
-        name,
-        description,
-        price,
-        discount_price,
-        category_id,
-        image_url,
-        stock_quantity,
-        unit,
-        is_featured,
-        productId
-      ]
-    );
-    
-    res.json({ message: 'Product updated successfully' });
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Update product
+      await client.query(
+        `UPDATE products SET 
+          name = $1, 
+          description = $2, 
+          price = $3, 
+          discount_price = $4,
+          category_id = $5, 
+          image_url = $6, 
+          stock_quantity = $7, 
+          unit = $8, 
+          is_featured = $9
+         WHERE product_id = $10`,
+        [
+          name,
+          description,
+          price,
+          discount_price,
+          category_id,
+          image_url,
+          stock_quantity,
+          unit,
+          is_featured,
+          productId
+        ]
+      );
+
+      // Handle subcategory mapping
+      if (subcategory_id) {
+        // Remove existing mapping
+        await client.query(
+          'DELETE FROM product_subcategories WHERE product_id = $1',
+          [productId]
+        );
+        
+        // Add new mapping
+        await client.query(
+          'INSERT INTO product_subcategories (product_id, subcategory_id) VALUES ($1, $2)',
+          [productId, parseInt(subcategory_id)]
+        );
+      } else {
+        // Remove subcategory mapping if no subcategory selected
+        await client.query(
+          'DELETE FROM product_subcategories WHERE product_id = $1',
+          [productId]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ message: 'Product updated successfully' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Product update error:', error);
     res.status(500).json({ 
@@ -2349,8 +2473,17 @@ function getCommonAttributes(product1, product2) {
   // Exclude fields that shouldn't be compared
   const excludedFields = new Set([
     'product_id', 'image_url', 'created_at', 'updated_at',
-    'average_rating', 'review_count', 'subcategory_id', 'category_id'
+    'average_rating', 'review_count', 'category_id'
   ]);
+  
+  // Add subcategory information as a special case
+  if (product1.subcategory_name !== undefined && product2.subcategory_name !== undefined) {
+    attributes.push({
+      name: 'subcategory',
+      values: [product1.subcategory_name, product2.subcategory_name]
+    });
+  }
+  
   for (const key of keys) {
     if (!excludedFields.has(key) && product1[key] !== undefined && product2[key] !== undefined) {
       attributes.push({

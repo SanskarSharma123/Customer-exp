@@ -10,7 +10,12 @@ You are an intent classifier for an eCommerce chatbot. Classify the user message
 - cart_navigate → "User wants to go to, open/see/navigate to the  cart page/section to view cart contents, view items in cart "
 - category_min_max_browsing -> "User is searching,list for products within a specific category, filtered by price range or other attributes. if the user wants the chatbot to list/fetch/retrive/return/provide/output products"
 - cart_management → "User wants to add, remove, update their shopping cart."
-- place_order → "User expresses intent to complete a purchase, proceed to checkout, or confirm an order for one or more items in the cart. Phrases like 'place the order', 'checkout', 'buy now', or 'confirm my purchase' are relevant."- switch_mode -> "User requests to switch the website appearance between dark mode and light mode."
+- place_order → "User expresses intent to complete a purchase, proceed to checkout, or confirm an order for one or more items in the cart. Phrases like 'place the order', 'checkout', 'buy now', or 'confirm my purchase' are relevant."
+- show_my_orders → "User wants to view their order history or list of past orders."
+- show_my_profile → "User wants to see their profile information."
+- track_order → "User wants to track the status of an order, provided the user has send a orderID"
+- track_home -> "User wants to navigate to home/dashboard section"
+- switch_mode -> "User requests to switch the website appearance between dark mode and light mode."
 
 Now classify this message:  
 "{user_query}"  

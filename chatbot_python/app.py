@@ -5,6 +5,7 @@ from intent_service import classify_intent
 from prompt.get_category import get_category_prompt
 from prompt.get_category_min_max import get_category_min_max
 from prompt.get_product_id_prompt import get_productid_quantity
+from prompt.get_orderID import get_order_id_prompt
 from langchain_ollama import OllamaLLM
 import requests
 import json
@@ -436,13 +437,70 @@ async def detect_intent(query: Query, request: Request):
                 "message": "Please complete the order process in your cart.",
                 "error": str(e)
             }
- 
+        
+    elif intent == "show_my_orders":
+        try:
+            res = requests.get("http://localhost:5000/api/orders", cookies={"token": token})
+            if res.status_code == 200:
+                return {"action": "show_my_orders", "orders": res.json()}
+            return {"action": "orders_fetch_failed", "message": "Unable to fetch orders"}
+        except Exception as e:
+            return {"action": "orders_fetch_failed", "message": str(e)}
+
+    elif intent == "show_my_profile":
+        try:
+            res = requests.get("http://localhost:5000/api/profile", cookies={"token": token})
+            if res.status_code == 200:
+                return {"action": "show_my_profile", "profile": res.json()}
+            return {"action": "profile_fetch_failed", "message": "Unable to fetch profile"}
+        except Exception as e:
+            return {"action": "profile_fetch_failed", "message": str(e)}
+    
+    elif intent == "track_order":
+        prompt = get_order_id_prompt(query.message)
+        result = model.invoke(prompt).strip()
+        result = result.replace("```json", "").replace("```", "").strip()
+
+        data = json.loads(result)
+        order_id = data.get("order_id")
+        if order_id and str(order_id).isdigit():
+            order_id = int(order_id)
+        else:
+            order_id = None
+
+        if not order_id:
+            return {"action": "order_tracking_failed", "message": "Order ID not found"}
+
+        try:
+            response = requests.get(
+                f"http://localhost:5000/api/orders/{order_id}/tracking",
+                cookies={"token": token}
+            )
+            if response.status_code == 200:
+                order_data = response.json()
+                return {
+                    "action": "order_tracking_success",
+                    "order_status": order_data.get("status", "No status available"),
+                    "order_id": order_id
+                }
+            elif response.status_code == 404:
+                return {"action": "order_tracking_failed", "message": "Order not found"}
+            else:
+                return {"action": "order_tracking_failed", "message": "Error fetching order status"}
+
+        except Exception as e:
+            print("Order tracking error:", e)
+            return {"action": "order_tracking_failed", "message": "Server error"}
+    
+    elif intent == "track_home":
+        return{
+            "action": "track_home"
+        } 
+
     elif intent == "price_filter":
         result = handle_price_filter(query.message)
     elif intent == "offers_discounts":
         result = handle_offers_discounts(query.message)
-    elif intent == "order_placement":
-        result = handle_order_placement(query.message)
     elif intent == "order_tracking":
         result = handle_order_tracking(query.message)
     elif intent == "return_refund":

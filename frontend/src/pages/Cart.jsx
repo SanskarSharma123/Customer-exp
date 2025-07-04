@@ -33,7 +33,42 @@ const Cart = () => {
   });
 }, [wsConnected, placingOrder, selectedAddress]);
 // Helper function to get cookie value
-const token = localStorage.getItem("token");
+const getTokenFromStorage = () => {
+  try {
+    // Debug: Log all localStorage keys
+    console.log("=== DEBUG: localStorage contents ===");
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const value = localStorage.getItem(key);
+      console.log(`Key: ${key}`, value);
+      
+      // Try to parse if it looks like JSON
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && parsed.token) {
+          console.log(`Token found in ${key}:`, parsed.token.substring(0, 20) + "...");
+          return parsed.token;
+        }
+      } catch (e) {
+        // Not JSON, that's fine
+      }
+    }
+    
+    // Try direct token access
+    const directToken = localStorage.getItem("token");
+    if (directToken) {
+      console.log("Direct token found:", directToken.substring(0, 20) + "...");
+      return directToken;
+    }
+    
+    console.log("No token found in localStorage");
+    return null;
+  } catch (error) {
+    console.error("Error retrieving token from localStorage:", error);
+    return null;
+  }
+};
+const token = getTokenFromStorage();
 const connectWebSocket = useCallback(() => {
   try {
     console.log("Token found:", token ? `${token.substring(0, 10)}...` : 'No token');
@@ -85,7 +120,7 @@ const connectWebSocket = useCallback(() => {
           console.log("🚀 Place order action received via WebSocket");
 
           if (data.payment === "cod") {
-            showNotification("Placing COD order via chatbot...", "info");
+            showNotification("Placing COD order via chatbot...", "success");
             await handleOrderPlacement2();
           } else {
             showNotification("Order request received! Processing...", "info");
@@ -351,114 +386,138 @@ const showNotification = (message, type = "success") => {
       setPlacingOrder(false);
     }
   };
-  const handleOrderPlacement2 = async () => {
+const handleOrderPlacement2 = async () => {
   console.log("🚀 handleOrderPlacement2 triggered - Chatbot initiated order");
   console.log("📍 Current addresses state:", addresses);
   console.log("📊 Addresses length:", addresses?.length);
   console.log("🔄 Loading state:", loading);
 
-  // Always fetch fresh addresses to avoid race conditions
-  console.log("🔄 Fetching fresh addresses to ensure consistency...");
-  
   try {
     const profileResponse = await fetch(`${apiUrl}/profile`, {
       credentials: "include",
     });
-    
+
     if (!profileResponse.ok) {
       console.error("❌ Failed to fetch profile:", profileResponse.status);
       throw new Error("Failed to fetch profile");
     }
-    
+
     const profileData = await profileResponse.json();
     const fetchedAddresses = profileData.addresses;
-    
+
     console.log("📍 Fetched addresses:", fetchedAddresses);
     console.log("📊 Fetched addresses count:", fetchedAddresses?.length);
-    
+
     if (!fetchedAddresses || fetchedAddresses.length === 0) {
       console.error("❌ No addresses available even after fetching");
       showNotification("No delivery address found. Please add one.", "error");
       return;
     }
-    
-    // Update addresses state for consistency
+
     setAddresses(fetchedAddresses);
-    
-    // Find the best address to use
+
     const defaultAddressObj = fetchedAddresses.find(addr => addr.is_default);
     const addressToUse = defaultAddressObj || fetchedAddresses[0];
     const addressId = String(addressToUse.address_id);
-    
+
     console.log("🎯 Selected address for chatbot order:", {
       addressId,
       isDefault: addressToUse.is_default,
       address: addressToUse
     });
-    
-    // Also update selectedAddress state
+
     setSelectedAddress(addressId);
-    
-    await placeOrderWithAddress(addressId);
-    
-  } catch (error) {
-    console.error("❌ Error in handleOrderPlacement2:", error);
-    showNotification("Failed to fetch delivery address. Please try again.", "error");
-    return;
-  }
-};
+    setPlacingOrder(true);
 
-// Helper function to place order with a specific address
-const placeOrderWithAddress = async (addressId) => {
-  console.log("🚀 Placing order with address ID:", addressId);
-  
-  setPlacingOrder(true);
+    // Mimicking handlePlaceOrder logic
+    console.log("🛒 Sending order with address ID (chatbot):", addressId);
 
-  try {
-    // Small delay to ensure state updates are processed
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const orderPayload = {
-      addressId: addressId,
-      paymentMethod: "cash_on_delivery",
-    };
-    
-    console.log("📦 Order payload:", orderPayload);
-    
     const response = await fetch(`${apiUrl}/orders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(orderPayload),
+      body: JSON.stringify({
+        addressId: addressId,
+        paymentMethod: paymentMethod,  // Assuming this is globally available like in handlePlaceOrder
+      }),
       credentials: "include",
     });
 
-    console.log("📡 Order response status:", response.status);
-    
     const data = await response.json();
-    console.log("📄 Order response data:", data);
 
     if (!response.ok) {
-      console.error("❌ Order placement failed:", data);
-      throw new Error(data.message || "Failed to place order");
+      throw new Error(data.message || "Failed to place order via chatbot");
     }
 
-    console.log("✅ Order placed successfully:", data);
-    showNotification("Order placed successfully via chatbot! Redirecting...");
+    showNotification("Order placed successfully by chatbot! Redirecting...");
 
     setTimeout(() => {
       navigate("/order-confirmation", {
         state: { orderId: data.orderId },
       });
     }, 1500);
+
   } catch (error) {
-    console.error("❌ Chatbot order error:", error);
+    console.error("❌ Error in handleOrderPlacement2:", error);
     showNotification("Failed to place order: " + error.message, "error");
   } finally {
     setPlacingOrder(false);
   }
 };
+
+
+// Helper function to place order with a specific address
+// const placeOrderWithAddress = async (addressId) => {
+//   console.log("🚀 Placing order with address ID:", addressId);
+  
+//   setPlacingOrder(true);
+
+//   try {
+//     // Small delay to ensure state updates are processed
+//     await new Promise(resolve => setTimeout(resolve, 100));
+    
+//     const orderPayload = {
+//       addressId: addressId,
+//       paymentMethod: "cash_on_delivery",
+//     };
+    
+//     console.log("📦 Order payload:", orderPayload);
+    
+//     const response = await fetch(`${apiUrl}/orders`, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify(orderPayload),
+//       credentials: "include",
+//     });
+
+//     console.log("📡 Order response status:", response.status);
+    
+//     const data = await response.json();
+//     console.log("📄 Order response data:", data);
+
+//     if (!response.ok) {
+//       console.error("❌ Order placement failed:", data);
+//       throw new Error(data.message || "Failed to place order");
+//     }
+
+//     console.log("✅ Order placed successfully:", data);
+//     showNotification("Order placed successfully via chatbot! Redirecting...");
+
+//     setTimeout(() => {
+//       navigate("/order-confirmation", {
+//         state: { orderId: data.orderId },
+//       });
+//     }, 1500);
+//   } catch (error) {
+//     console.error("❌ Chatbot order error:", error);
+//     showNotification("Failed to place order: " + error.message, "error");
+//   } finally {
+//     setPlacingOrder(false);
+//   }
+// };
   const handleAddressAdded = (newAddress) => {
     console.log("New address added:", newAddress);
     

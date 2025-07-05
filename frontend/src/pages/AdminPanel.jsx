@@ -10,13 +10,13 @@ const AdminPanel = () => {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]); // Added subcategories
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingProduct, setEditingProduct] = useState(null);
   const [personnel, setPersonnel] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  
   
   const [newPersonnel, setNewPersonnel] = useState({
     name: '',
@@ -30,70 +30,97 @@ const AdminPanel = () => {
     price: 0,
     discount_price: 0,
     category_id: '',
+    subcategory_id: '', // Added subcategory
     image_url: '',
     stock_quantity: 0,
     unit: 'pieces',
     is_featured: false
   });
   const navigate = useNavigate();
-const [productQuery, setProductQuery] = useState('');
-const [generating, setGenerating] = useState(false);
-const [suggestions, setSuggestions] = useState(null);
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const profileResponse = await fetch(`${apiUrl}/profile`, {
-          credentials: "include",
-        });
+  const [productQuery, setProductQuery] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [suggestions, setSuggestions] = useState(null);
+  
+  // Replace your useEffect with this optimized version
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const controller = new AbortController();
+      // const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout
+      
+      const profileResponse = await fetch(`${apiUrl}/profile`, {
+        credentials: "include",
+        signal: controller.signal
+      });
 
-        if (!profileResponse.ok) {
-          const errorData = await profileResponse.json();
-          throw new Error(errorData.message || 'Failed to fetch profile');
-        }
-
-        const profileData = await profileResponse.json();
-        if (!profileData.user?.isAdmin) {
-          navigate("/");
-          return;
-        }
-
-       const [productsRes, ordersRes, usersRes, categoriesRes, personnelRes, reviewsRes, recommendationsRes] = await Promise.all([
-  fetch(`${apiUrl}/admin/products`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/orders`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/users`, { credentials: "include" }),
-  fetch(`${apiUrl}/categories`),
-  fetch(`${apiUrl}/admin/delivery-personnel`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/reviews`, { credentials: "include" }),
-  fetch(`${apiUrl}/admin/recommendations`, { credentials: "include" })
-]);
-
-        const [productsData, ordersData, usersData, categoriesData, personnelData, reviewsData, recommendationsData] = await Promise.all([
-          productsRes.json(),
-          ordersRes.json(),
-          usersRes.json(),
-          categoriesRes.json(),
-          personnelRes.json(),
-          reviewsRes.json(),
-          recommendationsRes.json()
-        ]);
-
-        setProducts(productsData);
-        setOrders(ordersData);
-        setUsers(usersData);
-        setCategories(categoriesData);
-        setPersonnel(personnelData);
-        setReviews(reviewsData);
-        setLoading(false);
-        setRecommendations(Array.isArray(recommendationsData) ? recommendationsData : []);
-
-      } catch (error) {
-        console.error('Admin panel error:', error);
-        setError(error.message);
-        setLoading(false);
+      if (!profileResponse.ok) {
+        const errorData = await profileResponse.json();
+        throw new Error(errorData.message || 'Failed to fetch profile');
       }
-    };
-    fetchData();
-  }, [navigate]);
+
+      const profileData = await profileResponse.json();
+      if (!profileData.user?.isAdmin) {
+        navigate("/");
+        return;
+      }
+
+      // Define all endpoints
+      const endpoints = [
+        `${apiUrl}/admin/products`,
+        `${apiUrl}/admin/orders`,
+        `${apiUrl}/admin/users`,
+        `${apiUrl}/categories`,
+        `${apiUrl}/subcategories`,
+        `${apiUrl}/admin/delivery-personnel`,
+        `${apiUrl}/admin/reviews`,
+        `${apiUrl}/admin/recommendations`
+      ];
+
+      // Create fetch promises with timeout handling
+      const fetchPromises = endpoints.map(endpoint => 
+        fetch(endpoint, {
+          credentials: "include",
+          signal: controller.signal
+        }).then(response => {
+          if (!response.ok) throw new Error(`Failed to fetch ${endpoint}`);
+          return response.json();
+        })
+      );
+
+      // Execute all requests with timeout
+      const [
+        productsData, 
+        ordersData, 
+        usersData, 
+        categoriesData, 
+        subcategoriesData,
+        personnelData, 
+        reviewsData, 
+        recommendationsData
+      ] = await Promise.all(fetchPromises);
+
+      // Set state
+      setProducts(productsData);
+      setOrders(ordersData);
+      setUsers(usersData);
+      setCategories(categoriesData);
+      setSubcategories(subcategoriesData);
+      setPersonnel(personnelData);
+      setReviews(reviewsData);
+      setRecommendations(Array.isArray(recommendationsData) ? recommendationsData : []);
+
+      // clearTimeout(timeoutId);
+      setLoading(false);
+
+    } catch (error) {
+      console.error('Admin panel error:', error);
+      setError(error.name === 'AbortError' ? 'Request timed out (60s)' : error.message);
+      setLoading(false);
+    }
+  };
+  
+  fetchData();
+}, [navigate]);
 
   // Product Handlers
   const handleProductChange = (e) => {
@@ -171,6 +198,7 @@ const generateProductSuggestions = async () => {
       description: data.description || `Quality ${productQuery.trim()} product`,
       price: parseFloat(data.price) || 100,
       category: data.category || 'General',
+      subcategory: data.subcategory || '',
       unit: data.unit || 'pieces',
       stock_quantity: parseInt(data.stock_quantity) || 10,
       image_url: data.image_url || ''
@@ -213,39 +241,46 @@ const generateProductSuggestions = async () => {
   }
 };
 
-const applySuggestions = () => {
-  if (!suggestions) return;
-  
-  // Find category ID by name
-  const categoryMatch = categories.find(cat => 
-    cat.name.toLowerCase().includes(suggestions.category.toLowerCase()) ||
-    suggestions.category.toLowerCase().includes(cat.name.toLowerCase())
-  );
-  
-  const suggestionData = {
-    name: suggestions.name || '',
-    description: suggestions.description || '',
-    price: suggestions.price || 0,
-    category_id: categoryMatch?.category_id || '',
-    stock_quantity: suggestions.stock_quantity || 10,
-    unit: suggestions.unit || 'pieces',
-    image_url: suggestions.image_url || '',
-    discount_price: 0,
-    is_featured: false
+ const applySuggestions = () => {
+    if (!suggestions) return;
+    
+    // Find category ID by name
+    const categoryMatch = categories.find(cat => 
+      cat.name.toLowerCase().includes(suggestions.category.toLowerCase()) ||
+      suggestions.category.toLowerCase().includes(cat.name.toLowerCase())
+    );
+    
+    // Find subcategory ID by name (within the matched category)
+    const subcategoryMatch = subcategories.find(sub =>
+      sub.name.toLowerCase().includes(suggestions.subcategory?.toLowerCase() || '') &&
+      (!categoryMatch || sub.category_id === categoryMatch.category_id)
+    );
+    
+    const suggestionData = {
+      name: suggestions.name || '',
+      description: suggestions.description || '',
+      price: suggestions.price || 0,
+      category_id: categoryMatch?.category_id || '',
+      subcategory_id: subcategoryMatch?.subcategory_id || '', // Added subcategory
+      stock_quantity: suggestions.stock_quantity || 10,
+      unit: suggestions.unit || 'pieces',
+      image_url: suggestions.image_url || '',
+      discount_price: 0,
+      is_featured: false
+    };
+    
+    if (editingProduct) {
+      setEditingProduct(prev => ({ ...prev, ...suggestionData }));
+    } else {
+      setNewProduct(prev => ({ ...prev, ...suggestionData }));
+    }
+    
+    // Clear suggestions
+    setSuggestions(null);
+    setProductQuery('');
+    
+    alert('✅ AI suggestions applied! Please review and adjust as needed.');
   };
-  
-  if (editingProduct) {
-    setEditingProduct(prev => ({ ...prev, ...suggestionData }));
-  } else {
-    setNewProduct(prev => ({ ...prev, ...suggestionData }));
-  }
-  
-  // Clear suggestions
-  setSuggestions(null);
-  setProductQuery('');
-  
-  alert('✅ AI suggestions applied! Please review and adjust as needed.');
-};
 
   const handleAddProduct = async () => {
     try {
@@ -269,6 +304,7 @@ const applySuggestions = () => {
         price: 0,
         discount_price: 0,
         category_id: '',
+        subcategory_id: '',
         image_url: '',
         stock_quantity: 0,
         unit: 'pieces',
@@ -514,6 +550,7 @@ const applySuggestions = () => {
                     price: 0,
                     discount_price: 0,
                     category_id: '',
+                    subcategory_id: '',
                     image_url: '',
                     stock_quantity: 0,
                     unit: 'pieces',
@@ -588,6 +625,7 @@ const applySuggestions = () => {
         <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
           <strong>Name:</strong> {suggestions.name}<br/>
           <strong>Category:</strong> {suggestions.category}<br/>
+          <strong>Subcategory:</strong> {suggestions.subcategory}<br/>
           <strong>Price:</strong> ₹{suggestions.price}<br/>
           <strong>Description:</strong> {suggestions.description?.substring(0, 100)}...
         </div>
@@ -636,7 +674,29 @@ const applySuggestions = () => {
                     ))}
                   </select>
                 </div>
+                <div>
+  <label>📂 Subcategory</label>
+  <select
+    name="subcategory_id"
+    value={editingProduct?.subcategory_id || newProduct.subcategory_id}
+    onChange={handleProductChange}
+  >
+    <option value="">Select Subcategory</option>
+    {subcategories
+      .filter(sub => {
+        const selectedCategoryId = editingProduct?.category_id || newProduct.category_id;
+        // Convert both to strings for comparison to handle type mismatches
+        return selectedCategoryId && String(sub.category_id) === String(selectedCategoryId);
+      })
+      .map(subcategory => (
+        <option key={subcategory.subcategory_id} value={subcategory.subcategory_id}>
+          {subcategory.name}
+        </option>
+      ))}
+  </select>
+</div>
               </div>
+              
 
               <div className="form-row">
                 <div>

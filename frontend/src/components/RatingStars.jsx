@@ -2,8 +2,11 @@ import React from "react";
 import "../css/RatingStars.css";
 
 const RatingStars = ({ rating }) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
+    let safeRating = Number(rating);
+    if (isNaN(safeRating) || safeRating < 0) safeRating = 0;
+    if (safeRating > 5) safeRating = 5;
+    const fullStars = Math.floor(safeRating);
+    const hasHalfStar = safeRating % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
     return (

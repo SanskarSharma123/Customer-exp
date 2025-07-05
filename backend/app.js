@@ -176,10 +176,14 @@ app.get('/api/products', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
-      GROUP BY p.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `);
     res.json(products.rows);
   } catch (error) {
@@ -308,6 +312,71 @@ app.get('/api/categories', async (req, res) => {
   } catch (error) {
     console.error('Categories fetch error:', error);
     res.status(500).json({ message: 'Server error fetching categories' });
+  }
+});
+
+app.get('/api/subcategories', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, c.name as category_name 
+      FROM subcategories s 
+      JOIN categories c ON s.category_id = c.category_id 
+      ORDER BY c.name, s.name
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/subcategories/:categoryId', async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const result = await pool.query(
+      'SELECT * FROM subcategories WHERE category_id = $1 ORDER BY name',
+      [categoryId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/products/similar-in-subcategories', async (req, res) => {
+  try {
+    const { subcategory_ids, exclude_product_ids, category_id } = req.body;
+    if (!Array.isArray(subcategory_ids) || subcategory_ids.length === 0) {
+      return res.status(400).json({ message: 'subcategory_ids array is required' });
+    }
+    if (!category_id) {
+      return res.status(400).json({ message: 'category_id is required' });
+    }
+    
+    const excludeIds = Array.isArray(exclude_product_ids) ? exclude_product_ids : [];
+    const products = await pool.query(
+      `SELECT p.*, 
+        COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
+      FROM products p
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+      WHERE p.category_id = $1 
+        AND ps.subcategory_id = ANY($2) 
+        AND p.product_id != ALL($3)
+      GROUP BY p.product_id, ps.subcategory_id, s.name
+      ORDER BY p.is_featured DESC, average_rating DESC, p.name
+      LIMIT 12`,
+      [category_id, subcategory_ids, excludeIds.length ? excludeIds : [0]]
+    );
+    res.json(products.rows);
+  } catch (error) {
+    console.error('Error fetching similar products:', error);
+    res.status(500).json({ message: 'Server error fetching similar products' });
   }
 });
 
@@ -623,18 +692,22 @@ app.get('/api/products/compare', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name,
+        p.category_id
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
       WHERE p.product_id = ANY($1)
-      GROUP BY p.product_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `, [productIds]);
 
     if (products.rows.length !== 2) {
       return res.status(404).json({ message: 'One or more products not found' });
     }
 
-    // Structure the data for comparison
     const comparisonData = {
       products: products.rows,
       commonAttributes: getCommonAttributes(products.rows[0], products.rows[1])
@@ -1089,27 +1162,29 @@ app.get('/api/products/category/:categoryId', async (req, res) => {
 
 app.get('/api/products/:productId', async (req, res) => {
   try {
-      const productId = req.params.productId;
-      
-      const productResult = await pool.query(`
-          SELECT p.*, 
-                 COALESCE(ROUND(AVG(r.rating)::numeric, 1), 0) as average_rating,
-                 COUNT(r.review_id) as review_count
-          FROM products p
-          LEFT JOIN reviews r ON p.product_id = r.product_id
-          WHERE p.product_id = $1
-          GROUP BY p.product_id
-      `, [productId]);
+    const productId = req.params.productId;
+    const productResult = await pool.query(`
+      SELECT p.*, 
+        COALESCE(ROUND(AVG(r.rating)::numeric, 1), 0) as average_rating,
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
+      FROM products p
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+      WHERE p.product_id = $1
+      GROUP BY p.product_id, ps.subcategory_id, s.name
+    `, [productId]);
 
-      if (productResult.rows.length === 0) {
-          return res.status(404).json({ message: 'Product not found' });
-      }
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
 
-      const product = productResult.rows[0];
-      res.json(product);
+    res.json(productResult.rows[0]);
   } catch (error) {
-      console.error('Product fetch error:', error);
-      res.status(500).json({ message: 'Server error fetching product' });
+    console.error('Product fetch error:', error);
+    res.status(500).json({ message: 'Server error fetching product' });
   }
 });
 app.post('/api/orders', authenticateToken, async (req, res) => {
@@ -1585,12 +1660,13 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
       name, 
       description, 
       price, 
-      discount_price,  // Changed from discountPrice
-      category_id,     // Changed from categoryId
-      image_url,       // Changed from imageUrl
-      stock_quantity,  // Changed from stockQuantity
+      discount_price,
+      category_id,
+      subcategory_id,  // New field
+      image_url,
+      stock_quantity,
       unit, 
-      is_featured      // Changed from isFeatured
+      is_featured
     } = req.body;
 
     // Validation
@@ -1606,37 +1682,61 @@ app.post('/api/admin/products', authenticateToken, isAdmin, async (req, res) => 
       });
     }
 
-    const result = await pool.query(
-      `INSERT INTO products (
-        name, description, price, discount_price, 
-        category_id, image_url, stock_quantity, 
-        unit, is_featured
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
-       RETURNING product_id`,
-      [
-        name,
-        description,
-        parseFloat(price),
-        parseFloat(discount_price) || 0,
-        parseInt(category_id),
-        image_url,
-        parseInt(stock_quantity) || 0,
-        unit,
-        Boolean(is_featured)
-      ]
-    );
+    const client = await pool.connect();
     try {
-      // Clear trending/best-selling caches since new product affects these
-      await axios.post(`${SENTIMENT_API_URL}/clear-cache/all`);
-      console.log('Cleared all recommendation caches after new product creation');
-    } catch (cacheError) {
-      console.error('Cache clear error:', cacheError);
-    }
+      await client.query('BEGIN');
+      
+      // Insert product
+      const result = await client.query(
+        `INSERT INTO products (
+          name, description, price, discount_price, 
+          category_id, image_url, stock_quantity, 
+          unit, is_featured
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+         RETURNING product_id`,
+        [
+          name,
+          description,
+          parseFloat(price),
+          parseFloat(discount_price) || 0,
+          parseInt(category_id),
+          image_url,
+          parseInt(stock_quantity) || 0,
+          unit,
+          Boolean(is_featured)
+        ]
+      );
 
-    res.status(201).json({
-      message: 'Product added successfully',
-      productId: result.rows[0].product_id
-    });
+      const productId = result.rows[0].product_id;
+
+      // Handle subcategory mapping
+      if (subcategory_id) {
+        await client.query(
+          `INSERT INTO product_subcategories (product_id, subcategory_id) 
+           VALUES ($1, $2)`,
+          [productId, parseInt(subcategory_id)]
+        );
+      }
+
+      await client.query('COMMIT');
+      
+      // Clear caches
+      try {
+        await axios.post(`${SENTIMENT_API_URL}/clear-cache/all`);
+      } catch (cacheError) {
+        console.error('Cache clear error:', cacheError);
+      }
+
+      res.status(201).json({
+        message: 'Product added successfully',
+        productId
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Product creation error:', error);
     
@@ -1706,18 +1806,45 @@ Please respond with ONLY a valid JSON object containing exactly these fields:
   "description": "detailed product description (2-3 sentences)",
   "price": 25000,
   "category": "Electronics",
+  "subcategory": "Smartphones",
   "unit": "pieces",
   "stock_quantity": 10,
   "image_url": ""
 }
 
 Categories to choose from: Electronics, Fruits & Vegetables, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Snacks & Confectionery, Personal Care, Household Items, Books & Stationery, Sports & Fitness
+Subcategories to choose from:
+Apples & Exotic Fruits, Bananas & Citrus, Leafy Greens & Herbs, Root Vegetables, Gourds & Others,
+Milk & Milk Drinks, Cheese & Paneer, Butter, Ghee & Cream, Yogurt & Curd, Eggs, Ice Cream & Sweets,
+Breads, Cakes & Pastries, Biscuits & Cookies, Savory Baked Goods,
+Chips & Namkeen, Chocolates & Sweets, Soft Drinks & Juices, Energy & Health Drinks,
+Cleaning Supplies, Air Fresheners & Insect Repellents, Laundry & Fabric Care, Kitchen & Household Accessories,
+Chicken, Fish & Seafood, Mutton & Lamb, Pork & Beef, Other Meat,
+Frozen Snacks, Frozen Vegetables & Fruits, Frozen Meat & Seafood, Frozen Desserts & Ice Cream,
+Soaps & Body Wash, Shampoo & Hair Care, Oral Care, Face Care, Shaving & Grooming,
+Diapers & Wipes, Baby Food & Formula, Baby Skincare, Other Baby Essentials,
+Dog Food & Treats, Cat Food & Litter, Pet Accessories, Other Pet Supplies,
+Cereals & Flakes, Oats & Porridge, Spreads & Mixes, Breakfast Snacks,
+Ketchup & Sauces, Mayonnaise & Dressings, Chutneys & Pickles, Mustard & Specialty Sauces,
+Canned Vegetables & Beans, Ready to Eat Meals, Honey & Spreads, Condensed & Evaporated Milk,
+Protein & Nutrition Powders, Herbal & Ayurvedic, Health Drinks, Supplements & Others,
+Cookware & Bakeware, Kitchen Appliances, Tableware & Storage, Home Essentials,
+Smartphones, Tablets, Televisions, Audio Devices, Other Electronics,
+Keyboards & Mice, Storage Devices, PC Components, Peripherals & Accessories,
+Smartwatches & Bands, Smart Speakers, Home Automation, Other Smart Devices,
+Consoles, Games, Controllers & Accessories, Gaming Peripherals,
+Washing Machines, Refrigerators, Air Conditioners, Kitchen Appliances, Other Appliances,
+Men's Clothing, Women's Clothing, Unisex & Kids, Footwear & Accessories,
+Televisions, Streaming Devices, Speakers & Soundbars, Other Entertainment,
+Books, Magazines & Newspapers, Music & Movies, Digital & Subscriptions,
+Fitness Equipment, Sports Gear, Footwear & Apparel, Accessories,
+Makeup, Skincare, Hair Care, Personal Hygiene, Beauty Tools,
+Car Accessories, Car Care & Maintenance, Electronics & Gadgets, Other Automotive
 
 Important: 
 - Price should be in Indian Rupees (number only, no currency symbol)
 - Respond with ONLY the JSON object, no additional text or formatting
 - Do not wrap in markdown code blocks`;
-
     console.log('Sending request to Groq API...');
 
     const completion = await groq.chat.completions.create({
@@ -1860,6 +1987,34 @@ Important:
     });
   }
 });
+
+function getCommonAttributes(product1, product2) {
+  const attributes = [];
+  const keys = new Set([...Object.keys(product1), ...Object.keys(product2)]);
+  
+  const excludedFields = new Set([
+    'product_id', 'image_url', 'created_at', 'updated_at',
+    'average_rating', 'review_count', 'category_id'
+  ]);
+  
+  // Add subcategory as a special attribute
+  if (product1.subcategory_name !== undefined && product2.subcategory_name !== undefined) {
+    attributes.push({
+      name: 'subcategory',
+      values: [product1.subcategory_name, product2.subcategory_name]
+    });
+  }
+  
+  for (const key of keys) {
+    if (!excludedFields.has(key) && product1[key] !== undefined && product2[key] !== undefined) {
+      attributes.push({
+        name: key.replace(/_/g, ' '),
+        values: [product1[key], product2[key]]
+      });
+    }
+  }
+  return attributes;
+}
 // Admin: Update product
 // Update product route
 app.put('/api/admin/products/:productId', authenticateToken, isAdmin, async (req, res) => {
@@ -1869,47 +2024,84 @@ app.put('/api/admin/products/:productId', authenticateToken, isAdmin, async (req
       name,
       description,
       price,
-      discount_price,  // Changed from discountPrice
-      category_id,     // Changed from categoryId
-      image_url,       // Changed from imageUrl
-      stock_quantity,  // Changed from stockQuantity
+      discount_price,
+      category_id,
+      subcategory_id,  // New field
+      image_url,
+      stock_quantity,
       unit,
-      is_featured      // Changed from isFeatured
+      is_featured
     } = req.body;
 
-    await pool.query(
-      `UPDATE products SET 
-        name = $1, 
-        description = $2, 
-        price = $3, 
-        discount_price = $4,
-        category_id = $5, 
-        image_url = $6, 
-        stock_quantity = $7, 
-        unit = $8, 
-        is_featured = $9
-       WHERE product_id = $10`,
-      [
-        name,
-        description,
-        price,
-        discount_price,
-        category_id,
-        image_url,
-        stock_quantity,
-        unit,
-        is_featured,
-        productId
-      ]
-    );
+    const client = await pool.connect();
     try {
-      await axios.post(`${SENTIMENT_API_URL}/clear-cache/product/${productId}`);
-      console.log(`Cleared cache for updated product ${productId}`);
-    } catch (cacheError) {
-      console.error('Cache clear error:', cacheError);
+      await client.query('BEGIN');
+      
+      // Update product
+      await client.query(
+        `UPDATE products SET 
+          name = $1, 
+          description = $2, 
+          price = $3, 
+          discount_price = $4,
+          category_id = $5, 
+          image_url = $6, 
+          stock_quantity = $7, 
+          unit = $8, 
+          is_featured = $9
+         WHERE product_id = $10`,
+        [
+          name,
+          description,
+          price,
+          discount_price,
+          category_id,
+          image_url,
+          stock_quantity,
+          unit,
+          is_featured,
+          productId
+        ]
+      );
+
+      // Handle subcategory mapping
+      if (subcategory_id) {
+        // Remove existing mapping
+        await client.query(
+          'DELETE FROM product_subcategories WHERE product_id = $1',
+          [productId]
+        );
+        
+        // Add new mapping
+        await client.query(
+          'INSERT INTO product_subcategories (product_id, subcategory_id) VALUES ($1, $2)',
+          [productId, parseInt(subcategory_id)]
+        );
+      } else {
+        // Remove subcategory mapping if none selected
+        await client.query(
+          'DELETE FROM product_subcategories WHERE product_id = $1',
+          [productId]
+        );
+      }
+
+      await client.query('COMMIT');
+      
+      // Clear caches
+      try {
+        await axios.post(`${SENTIMENT_API_URL}/clear-cache/product/${productId}`);
+      } catch (cacheError) {
+        console.error('Cache clear error:', cacheError);
+      }
+
+      res.json({ message: 'Product updated successfully' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-    res.json({ message: 'Product updated successfully' });
-  } catch (error) {
+  }catch (error) {
     console.error('Product update error:', error);
     res.status(500).json({ 
       message: 'Server error updating product',

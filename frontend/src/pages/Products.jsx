@@ -301,11 +301,14 @@ const Products = () => {
         {/* Products Grid */}
         <div className="products-grid">
           {products.length > 0 ? (
-            products.map((product, index) => (
-              <div key={product.product_id} className="product-card-wrapper" style={{animationDelay: `${index * 0.1}s`}}>
-                <ProductCard product={product} />
-              </div>
-            ))
+            products.map((product, index) => {
+              console.log('DEBUG ProductCard product:', product);
+              return (
+                <div key={product.product_id} className="product-card-wrapper" style={{animationDelay: `${index * 0.1}s`}}>
+                  <ProductCard product={product} />
+                </div>
+              );
+            })
           ) : (
             <div className="no-products">
               <div className="no-products-icon">

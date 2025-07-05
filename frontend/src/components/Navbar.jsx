@@ -21,8 +21,10 @@ const Navbar = ({ isLoggedIn, user, handleLogout }) => {
     handleStorageChange(); // Initial load
 
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('compareProductsChanged', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('compareProductsChanged', handleStorageChange);
     };
   }, []);
 

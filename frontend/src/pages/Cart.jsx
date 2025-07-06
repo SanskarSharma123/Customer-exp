@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../config/config";
 import AddressForm from "../components/AddressForm";
@@ -18,6 +18,179 @@ const Cart = () => {
   const [notification, setNotification] = useState({ show: false, message: "", type: "" });
   const navigate = useNavigate();
 
+
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
+
+  useEffect(() => {
+  console.log("WebSocket state changed:", {
+    connected: wsConnected,
+    placingOrder: placingOrder,
+    selectedAddress: selectedAddress
+  });
+}, [wsConnected, placingOrder, selectedAddress]);
+// Helper function to get cookie value
+const getTokenFromStorage = () => {
+  try {
+    // Debug: Log all localStorage keys
+    console.log("=== DEBUG: localStorage contents ===");
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const value = localStorage.getItem(key);
+      console.log(`Key: ${key}`, value);
+      
+      // Try to parse if it looks like JSON
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && parsed.token) {
+          console.log(`Token found in ${key}:`, parsed.token.substring(0, 20) + "...");
+          return parsed.token;
+        }
+      } catch (e) {
+        // Not JSON, that's fine
+      }
+    }
+    
+    // Try direct token access
+    const directToken = localStorage.getItem("token");
+    if (directToken) {
+      console.log("Direct token found:", directToken.substring(0, 20) + "...");
+      return directToken;
+    }
+    
+    console.log("No token found in localStorage");
+    return null;
+  } catch (error) {
+    console.error("Error retrieving token from localStorage:", error);
+    return null;
+  }
+};
+const token = getTokenFromStorage();
+const connectWebSocket = useCallback(() => {
+  try {
+    console.log("Token found:", token ? `${token.substring(0, 10)}...` : 'No token');
+
+    if (!token) {
+      console.warn("No token available, cannot establish WebSocket connection");
+      return;
+    }
+
+    const ws = new WebSocket(`ws://${window.location.hostname}:8000/ws`);
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+      setWsConnected(true);
+      reconnectAttempts.current = 0;
+
+      console.log("Sending authentication message...");
+      ws.send(JSON.stringify({ 
+        type: "auth", 
+        token: token 
+      }));
+
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        } else {
+          clearInterval(pingInterval);
+        }
+      }, 30000);
+
+      ws.pingInterval = pingInterval;
+    };
+
+    ws.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("WebSocket message received:", data);
+
+        if (data.type === "pong") {
+          console.log("Pong received - connection alive");
+        } else if (data.type === "auth_success") {
+          console.log("✅ WebSocket authentication successful");
+          showNotification("Connected successfully!", "success");
+        } else if (data.type === "auth_failed") {
+          console.error("❌ WebSocket authentication failed");
+          showNotification("Connection authentication failed", "error");
+        } 
+        else if (data.action === "place_order") {
+          console.log("🚀 Place order action received via WebSocket");
+
+          if (data.payment === "cod") {
+            showNotification("Placing COD order via chatbot...", "success");
+            await handleOrderPlacement2();
+          } else {
+            showNotification("Order request received! Processing...", "info");
+            await handlePlaceOrder();
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    };
+
+    ws.onclose = (event) => {
+      console.log("WebSocket connection closed:", event.code, event.reason);
+      setWsConnected(false);
+
+      if (ws.pingInterval) {
+        clearInterval(ws.pingInterval);
+      }
+
+      if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+        console.log(`Attempting to reconnect WebSocket in ${delay}ms...`);
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectAttempts.current++;
+          connectWebSocket();
+        }, delay);
+      } else if (reconnectAttempts.current >= maxReconnectAttempts) {
+        console.error("Max WebSocket reconnection attempts reached");
+        showNotification("Connection lost. Please refresh the page.", "error");
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setWsConnected(false);
+      showNotification("Connection error occurred", "error");
+    };
+
+    wsRef.current = ws;
+
+  } catch (error) {
+    console.error("Failed to create WebSocket connection:", error);
+    setWsConnected(false);
+    showNotification("Failed to establish connection", "error");
+  }
+  // eslint-disable-next-line
+}, []);
+
+
+// Initialize WebSocket connection
+useEffect(() => {
+  connectWebSocket();
+
+  return () => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    if (wsRef.current) {
+      // Clear ping interval if it exists
+      if (wsRef.current.pingInterval) {
+        clearInterval(wsRef.current.pingInterval);
+      }
+      wsRef.current.close(1000, "Component unmounting");
+    }
+  };
+}, [connectWebSocket]);
+  // Initialize WebSocket connection
+ 
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -85,9 +258,10 @@ const Cart = () => {
     }
   }, [notification.show]);
 
-  const showNotification = (message, type = "success") => {
-    setNotification({ show: true, message, type });
-  };
+const showNotification = (message, type = "success") => {
+  console.log(`Showing notification: ${message} (${type})`);
+  setNotification({ show: true, message, type });
+};
 
   const updateQuantity = async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
@@ -212,7 +386,138 @@ const Cart = () => {
       setPlacingOrder(false);
     }
   };
+const handleOrderPlacement2 = async () => {
+  console.log("🚀 handleOrderPlacement2 triggered - Chatbot initiated order");
+  console.log("📍 Current addresses state:", addresses);
+  console.log("📊 Addresses length:", addresses?.length);
+  console.log("🔄 Loading state:", loading);
 
+  try {
+    const profileResponse = await fetch(`${apiUrl}/profile`, {
+      credentials: "include",
+    });
+
+    if (!profileResponse.ok) {
+      console.error("❌ Failed to fetch profile:", profileResponse.status);
+      throw new Error("Failed to fetch profile");
+    }
+
+    const profileData = await profileResponse.json();
+    const fetchedAddresses = profileData.addresses;
+
+    console.log("📍 Fetched addresses:", fetchedAddresses);
+    console.log("📊 Fetched addresses count:", fetchedAddresses?.length);
+
+    if (!fetchedAddresses || fetchedAddresses.length === 0) {
+      console.error("❌ No addresses available even after fetching");
+      showNotification("No delivery address found. Please add one.", "error");
+      return;
+    }
+
+    setAddresses(fetchedAddresses);
+
+    const defaultAddressObj = fetchedAddresses.find(addr => addr.is_default);
+    const addressToUse = defaultAddressObj || fetchedAddresses[0];
+    const addressId = String(addressToUse.address_id);
+
+    console.log("🎯 Selected address for chatbot order:", {
+      addressId,
+      isDefault: addressToUse.is_default,
+      address: addressToUse
+    });
+
+    setSelectedAddress(addressId);
+    setPlacingOrder(true);
+
+    // Mimicking handlePlaceOrder logic
+    console.log("🛒 Sending order with address ID (chatbot):", addressId);
+
+    const response = await fetch(`${apiUrl}/orders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        addressId: addressId,
+        paymentMethod: paymentMethod,  // Assuming this is globally available like in handlePlaceOrder
+      }),
+      credentials: "include",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to place order via chatbot");
+    }
+
+    showNotification("Order placed successfully by chatbot! Redirecting...");
+
+    setTimeout(() => {
+      navigate("/order-confirmation", {
+        state: { orderId: data.orderId },
+      });
+    }, 1500);
+
+  } catch (error) {
+    console.error("❌ Error in handleOrderPlacement2:", error);
+    showNotification("Failed to place order: " + error.message, "error");
+  } finally {
+    setPlacingOrder(false);
+  }
+};
+
+
+// Helper function to place order with a specific address
+// const placeOrderWithAddress = async (addressId) => {
+//   console.log("🚀 Placing order with address ID:", addressId);
+  
+//   setPlacingOrder(true);
+
+//   try {
+//     // Small delay to ensure state updates are processed
+//     await new Promise(resolve => setTimeout(resolve, 100));
+    
+//     const orderPayload = {
+//       addressId: addressId,
+//       paymentMethod: "cash_on_delivery",
+//     };
+    
+//     console.log("📦 Order payload:", orderPayload);
+    
+//     const response = await fetch(`${apiUrl}/orders`, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify(orderPayload),
+//       credentials: "include",
+//     });
+
+//     console.log("📡 Order response status:", response.status);
+    
+//     const data = await response.json();
+//     console.log("📄 Order response data:", data);
+
+//     if (!response.ok) {
+//       console.error("❌ Order placement failed:", data);
+//       throw new Error(data.message || "Failed to place order");
+//     }
+
+//     console.log("✅ Order placed successfully:", data);
+//     showNotification("Order placed successfully via chatbot! Redirecting...");
+
+//     setTimeout(() => {
+//       navigate("/order-confirmation", {
+//         state: { orderId: data.orderId },
+//       });
+//     }, 1500);
+//   } catch (error) {
+//     console.error("❌ Chatbot order error:", error);
+//     showNotification("Failed to place order: " + error.message, "error");
+//   } finally {
+//     setPlacingOrder(false);
+//   }
+// };
   const handleAddressAdded = (newAddress) => {
     console.log("New address added:", newAddress);
     
@@ -344,15 +649,34 @@ const Cart = () => {
 
   return (
     <>
+    {/* WebSocket Connection Status */}
+      {!wsConnected && (
+        <div style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          background: 'rgba(239, 68, 68, 0.9)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '0.8rem',
+          zIndex: 1001
+        }}>
+          🔌 Connection Lost
+        </div>
+      )}
       {/* Notification */}
       {notification.show && (
         <div style={{
           position: 'fixed',
           top: '20px',
           right: '20px',
-          background: notification.type === 'error' 
-            ? 'linear-gradient(135deg, #ef4444, #dc2626)' 
-            : 'linear-gradient(135deg, #10b981, #059669)',
+          background: 
+            notification.type === 'error' 
+              ? 'linear-gradient(135deg, #ef4444, #dc2626)' 
+              : notification.type === 'info'
+              ? 'linear-gradient(135deg, #3b82f6, #2563eb)'
+              : 'linear-gradient(135deg, #10b981, #059669)',
           color: 'white',
           padding: '16px 24px',
           borderRadius: '12px',

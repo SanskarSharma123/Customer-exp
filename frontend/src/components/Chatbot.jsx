@@ -1,9 +1,22 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, Routes,Route } from 'react';
 import '../css/Chatbot.css';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from "../contexts/ThemeContext";
+import Cart from '../pages/Cart';
+import Profile from '../pages/Profile'
+import Order from '../pages/Orders'
+import Dashboard from '../pages/Dashboard';
 
+<Routes>
+  {/* other routes */}
+  <Route path="/cart" element={<Cart />} />
+  <Route path="/order" element={<Order />} />
+  <Route path="/profile" element={<Profile />} />
+  <Route path="/dashboard" element={<Dashboard />} />
+
+
+</Routes>
 const Chatbot = () => {
 
   const { toggleDarkMode } = useTheme();
@@ -29,17 +42,24 @@ const Chatbot = () => {
   // Enhanced voice input configuration
   useEffect(() => {
     if (speechRecognizer) {
-      speechRecognizer.continuous = false;
+      speechRecognizer.continuous = true;
       speechRecognizer.interimResults = true;
       speechRecognizer.lang = 'en-IN';
       speechRecognizer.maxAlternatives = 1;
     }
   }, [speechRecognizer]);
-
-  const startListening = () => {
+const startListening = () => {
   if (!speechRecognizer) {
     setVoiceInputStatus("Speech Recognition not supported in your browser");
     setTimeout(() => setVoiceInputStatus(''), 3000);
+    return;
+  }
+
+  // If already listening, stop first
+  if (isListening) {
+    speechRecognizer.stop();
+    setIsListening(false);
+    setVoiceInputStatus("Stopping...");
     return;
   }
 
@@ -57,22 +77,31 @@ const Chatbot = () => {
   setTimeout(() => {
     try {
       // Configure speech recognizer before each use
-      speechRecognizer.continuous = false; // Changed to false for better control
+      speechRecognizer.continuous = true; // Changed back to true for continuous listening
       speechRecognizer.interimResults = true;
       speechRecognizer.lang = 'en-IN';
       speechRecognizer.maxAlternatives = 1;
 
-      let hasReceivedSpeech = false; // Track if we've received any speech
+      let hasReceivedSpeech = false;
       let finalTranscript = '';
+      let timeoutId = null; // Store timeout ID for cleanup
 
       // Set up event handlers
       speechRecognizer.onstart = () => {
         console.log("Speech recognition started");
         setVoiceInputStatus("Listening... Speak now");
+        
+        // Set auto-stop timeout after recognition actually starts
+        timeoutId = setTimeout(() => {
+          if (speechRecognizer && isListening) {
+            console.log("Auto-stopping speech recognition due to timeout");
+            speechRecognizer.stop();
+          }
+        }, 15000); // Increased to 15 seconds
       };
 
       speechRecognizer.onresult = (event) => {
-        hasReceivedSpeech = true; // Mark that we've received speech
+        hasReceivedSpeech = true;
         let interimTranscript = '';
         finalTranscript = '';
 
@@ -85,11 +114,12 @@ const Chatbot = () => {
           }
         }
 
-        // Update input with interim + final transcript
-        setInputMessage(finalTranscript + interimTranscript);
+        // Update input with current transcript
+        const currentTranscript = finalTranscript + interimTranscript;
+        setInputMessage(currentTranscript);
         
         if (finalTranscript) {
-          setVoiceInputStatus("Processing voice input...");
+          setVoiceInputStatus("Got it! Keep speaking or click send...");
         } else {
           setVoiceInputStatus("Listening... (processing speech)");
         }
@@ -97,27 +127,38 @@ const Chatbot = () => {
 
       speechRecognizer.onend = () => {
         console.log("Speech recognition ended");
+        
+        // Clear timeout if it exists
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        
+        // Always set listening to false when recognition ends
         setIsListening(false);
         
-        if (finalTranscript.trim() || inputMessage.trim()) {
-          setVoiceInputStatus("Voice input captured successfully!");
-          setTimeout(() => setVoiceInputStatus(''), 2000);
+        // Get the current input value at the time of ending
+        const currentInput = inputMessage.trim();
+        
+        if (currentInput || finalTranscript.trim()) {
+          setVoiceInputStatus("Voice input captured! You can edit or send the message.");
+          setTimeout(() => setVoiceInputStatus(''), 3000);
         } else if (hasReceivedSpeech) {
-          // If we received speech but no final transcript, try to restart once
-          setVoiceInputStatus("Continuing to listen...");
-          setTimeout(() => {
-            if (!isListening) { // Only restart if not currently listening
-              startListening();
-            }
-          }, 500);
+          setVoiceInputStatus("Speech detected but unclear. Please try again.");
+          setTimeout(() => setVoiceInputStatus(''), 3000);
         } else {
-          setVoiceInputStatus("Please speak clearly and try again.");
+          setVoiceInputStatus("No speech detected. Please speak clearly and try again.");
           setTimeout(() => setVoiceInputStatus(''), 3000);
         }
       };
 
       speechRecognizer.onerror = (event) => {
         console.error("Speech recognition error:", event.error);
+        
+        // Clear timeout if it exists
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        
         setIsListening(false);
         
         let errorMessage = "Voice input error";
@@ -129,16 +170,6 @@ const Chatbot = () => {
             errorMessage = "Microphone access denied. Please allow microphone access.";
             break;
           case 'no-speech':
-            // Don't treat no-speech as a hard error, just restart
-            if (!hasReceivedSpeech) {
-              setVoiceInputStatus("No speech detected. Trying again...");
-              setTimeout(() => {
-                if (!isListening) {
-                  startListening();
-                }
-              }, 1000);
-              return;
-            }
             errorMessage = "No speech detected. Please speak clearly.";
             break;
           case 'audio-capture':
@@ -158,14 +189,6 @@ const Chatbot = () => {
       // Start recognition
       speechRecognizer.start();
 
-      // Auto-stop listening after 10 seconds (reduced timeout)
-      setTimeout(() => {
-        if (speechRecognizer && isListening) {
-          console.log("Auto-stopping speech recognition due to timeout");
-          speechRecognizer.stop();
-        }
-      }, 10000);
-
     } catch (error) {
       console.error("Error starting speech recognition:", error);
       setIsListening(false);
@@ -174,7 +197,6 @@ const Chatbot = () => {
     }
   }, 100);
 };
-
   const speak = (text) => {
     // Immediately stop if voice is disabled
     if (!voiceEnabled) return;
@@ -358,6 +380,10 @@ else if (res.data.action === "greet") {
       else if (res.data.action === "product_details_failed") {
         addBotMessage("Unable to fetch product details. Please try again.");
       }
+      else if (res.data.action === "order_notification_sent") {
+        addBotMessage("Order placed successfully");
+      }
+
       else if (res.data.action === "order_success") {
         addBotMessage(res.data.response);
         localStorage.setItem("cart_updated", Date.now());
@@ -371,7 +397,10 @@ else if (res.data.action === "greet") {
       else if (res.data.action === "unauthenticated") {
         addBotMessage(res.data.response);
       }
-
+      else if (res.data.action === "cart_navigate") {
+          addBotMessage(res.data.response || "Navigating to your cart...");
+          navigate("/cart");
+      }
 
       else if (res.data.response) {
         addBotMessage(res.data.response);
@@ -382,6 +411,73 @@ else if (res.data.action === "greet") {
         addBotMessage("Switching theme mode...");
       }
       
+else if (res.data.action === "show_my_orders" && res.data.orders) {
+  if (res.data.orders.length === 0) {
+    addBotMessage("You have no recent orders.");
+  } else {
+    addBotMessage("Here are your recent orders:");
+
+    res.data.orders.forEach((order) => {
+      const orderText = `
+Order ID: ${order.order_id}
+Total: ₹${order.total_price}
+Status: ${order.status}
+Placed On: ${new Date(order.created_at).toLocaleDateString()}
+      `;
+      addBotMessage(orderText);
+    });
+    
+    // Add redirect after showing orders
+    addBotMessage("Redirecting you to your orders page for more details...");
+    setTimeout(() => {
+      navigate('/orders');
+    }, 2000); // 2 second delay to let user read the message
+  }
+}
+else if (res.data.action === "show_my_profile" && res.data.profile) {
+  const user = res.data.profile.user;
+  const addresses = res.data.profile.addresses || [];
+
+  let profileText = `
+Name: ${user.name}
+Email: ${user.email}
+Phone: ${user.phone}
+Registered On: ${new Date(user.created_at).toLocaleDateString()}
+  `;
+
+  if (addresses.length > 0) {
+    profileText += `\n\nSaved Addresses:\n`;
+    addresses.forEach((addr, index) => {
+      profileText += `
+${index + 1}. ${addr.address_line1}, ${addr.address_line2 || ""}, ${addr.city}, ${addr.state} - ${addr.postal_code}
+      `;
+    });
+  } else {
+    profileText += `\n\nNo saved addresses found.`;
+  }
+
+  addBotMessage(profileText);
+  
+  // Add redirect after showing profile
+  addBotMessage("Redirecting you to your profile page to edit details...");
+  setTimeout(() => {
+    navigate('/profile');
+  }, 2000); // 2 second delay to let user read the message
+}
+else if (res.data.action === "order_tracking_success" && res.data.order_status) {
+    addBotMessage(`Order Status:\n${res.data.order_status}`);
+    navigate(`/tracking/${res.data.order_id}`);
+
+}
+
+else if (res.data.action === "order_tracking_failed") {
+    addBotMessage(res.data.message || "Unable to track order. Please check the order ID and try again.");
+}
+
+else if(res.data.action === "track_home"){
+    addBotMessage("Redirecting to dashboard...");
+    navigate('/dashboard');
+}
 
       else if (res.data.intent) {
         addBotMessage(`Intent detected: ${res.data.intent}`);
@@ -402,6 +498,7 @@ else if (res.data.action === "greet") {
       setIsTyping(false);
     }
   };
+  
 
   const formatTime = (timestamp) => {
     return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

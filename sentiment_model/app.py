@@ -465,82 +465,90 @@ class EnhancedRecommendationSystem:
             # Get user profile and preferences
             user_profile = self.get_user_profile(user_id)
             prefs = user_profile['preferences'] if user_profile and user_profile.get('preferences') else None
-            
+
             # Get products in the same category
-            same_category = self.get_category_based_recommendations(user_id, product['category_id'], limit*3)
-            
+            same_category = self.get_category_based_recommendations(user_id, product['category_id'], limit * 3)
+
             # Get personalized recommendations as fallback
-            personalized = self.get_personalized_recommendations(user_id, limit*2)['products']
-            
+            personalized = self.get_personalized_recommendations(user_id, limit * 2)['products']
+
             # Combine and deduplicate
             candidates = []
             seen_ids = set()
-            
-            # Add same-category products first
+
             for p in same_category:
                 if p['product_id'] != product_id and p['product_id'] not in seen_ids:
                     candidates.append(p)
                     seen_ids.add(p['product_id'])
-            
-            # Add personalized recommendations if needed
+
             if len(candidates) < limit:
                 for p in personalized:
                     if p['product_id'] != product_id and p['product_id'] not in seen_ids:
                         candidates.append(p)
                         seen_ids.add(p['product_id'])
-            
-            # Score and sort by relevance
+
+            # Score and sort
             scored = []
             for candidate in candidates:
-                score = 0
-                
-                # Category match score (40%)
+                score = 0.0
+
+                # Category match (40%)
                 if candidate['category_id'] == product['category_id']:
                     score += 0.4
-                
+
                 # Price similarity (30%)
                 try:
                     product_price = float(product['discount_price'] or product['price'])
                     candidate_price = float(candidate['discount_price'] or candidate['price'])
                     price_diff = abs(product_price - candidate_price)
-                    price_score = 1 / (1 + price_diff/max(1, product_price))
+                    price_score = 1 / (1 + price_diff / max(1, product_price))
                     score += price_score * 0.3
                 except:
-                    score += 0.15
-                
-                # User preference score (30%)
+                    score += 0.15  # fallback price score
+
+                # User preferences (30%)
                 if prefs:
-                    # Category preference
                     cat_pref = prefs['categories'].get(candidate['category_id'], 0)
                     score += cat_pref * 0.2
-                    
-                    # Sentiment alignment
+
                     try:
                         sent_diff = abs(float(candidate.get('sentiment_score', 5)) - 
-                                    float(prefs['sentiment_profile']['avg_sentiment']))
+                                        float(prefs['sentiment_profile']['avg_sentiment']))
                         sent_score = 1 - (sent_diff / 10.0)
                         score += sent_score * 0.1
                     except:
                         pass
-                
+
                 scored.append((candidate, score))
-            
-            # Sort by score and select top
+
+            # Sort and pick top products
             scored.sort(key=lambda x: x[1], reverse=True)
             top_products = [p for p, score in scored[:limit]]
-            
-            return {
+
+            # Calculate dynamic confidence based on average score of top products
+            if scored:
+                avg_score = sum(score for _, score in scored[:limit]) / min(limit, len(scored))
+            else:
+                avg_score = 0.0
+
+            confidence = round(min(1.0, max(0.0, avg_score)), 2)
+
+            result = {
                 'type': 'event_based',
                 'products': top_products,
                 'message': f'Recommendations based on your interaction with {product["name"]}',
-                'confidence': 0.85,
+                'confidence': confidence,
                 'trigger_product': product_id
             }
-            
+
+            # Cache result
+            self.event_cache[cache_key] = (result, current_time)
+            return result
+
         except Exception as e:
             logger.error(f"Event-based recommendation failed: {e}")
-            # Fallback to personalized recommendations
             return self.get_personalized_recommendations(user_id, limit)
+
 
     def clear_event_cache(self, user_id=None, product_id=None):
         """Clear event-based recommendation cache"""

@@ -1,0 +1,7 @@
+{
+    "host": "localhost",
+    "database": "commerce_database",
+    "user": "vidya",
+    "password": "commerceproject",
+    "port": 5432
+} 

@@ -2,6 +2,7 @@ import React, { useState, useEffect} from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../config/config";
 import "../css/AdminPanel.css";
+import DynamicPricingDashboard from "../components/DynamicPricingDashboard";
 import productImages from "../components/ProductImages";
 
 const AdminPanel = () => {
@@ -477,7 +478,7 @@ const applySuggestions = () => {
       <div className="admin-sidebar">
         <h2>🎛️ Admin Panel</h2>
         <ul>
-         {["products", "orders", "users", "personnel", "reviews"].map(tab => (
+         {["products", "orders", "users", "personnel", "reviews", "dynamic-pricing"].map(tab => (
             <li
               key={tab}
               className={activeTab === tab ? "active" : ""}
@@ -1198,6 +1199,12 @@ const applySuggestions = () => {
     </table>
   </div>
 )}
+        {/* Dynamic Pricing Tab */}
+        {activeTab === "dynamic-pricing" && (
+          <div className="tab-content">
+            <DynamicPricingDashboard />
+          </div>
+        )}
       </div>
     </div>
   );

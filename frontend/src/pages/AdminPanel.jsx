@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../config/config";
 import "../css/AdminPanel.css";
 import productImages from "../components/ProductImages";
+import AdminInsights from "./AdminInsights";
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState("products");
@@ -17,6 +18,7 @@ const AdminPanel = () => {
   const [personnel, setPersonnel] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [insights, setInsights] = useState(null);
   
   const [newPersonnel, setNewPersonnel] = useState({
     name: '',
@@ -66,15 +68,17 @@ useEffect(() => {
 
       // Define all endpoints
       const endpoints = [
-        `${apiUrl}/admin/products`,
-        `${apiUrl}/admin/orders`,
-        `${apiUrl}/admin/users`,
-        `${apiUrl}/categories`,
-        `${apiUrl}/subcategories`,
-        `${apiUrl}/admin/delivery-personnel`,
-        `${apiUrl}/admin/reviews`,
-        `${apiUrl}/admin/recommendations`
-      ];
+  `${apiUrl}/admin/products`,
+  `${apiUrl}/admin/orders`,
+  `${apiUrl}/admin/users`,
+  `${apiUrl}/categories`,
+  `${apiUrl}/subcategories`,
+  `${apiUrl}/admin/delivery-personnel`,
+  `${apiUrl}/admin/reviews`,
+  `${apiUrl}/admin/recommendations`,
+  `${apiUrl}/admin/insights` // Add insights endpoint
+];
+
 
       // Create fetch promises with timeout handling
       const fetchPromises = endpoints.map(endpoint => 
@@ -89,15 +93,16 @@ useEffect(() => {
 
       // Execute all requests with timeout
       const [
-        productsData, 
-        ordersData, 
-        usersData, 
-        categoriesData, 
-        subcategoriesData,
-        personnelData, 
-        reviewsData, 
-        recommendationsData
-      ] = await Promise.all(fetchPromises);
+  productsData,
+  ordersData,
+  usersData,
+  categoriesData,
+  subcategoriesData,
+  personnelData,
+  reviewsData,
+  recommendationsData,
+  insightsData // Add insights data
+] = await Promise.all(fetchPromises);
 
       // Set state
       setProducts(productsData);
@@ -108,6 +113,7 @@ useEffect(() => {
       setPersonnel(personnelData);
       setReviews(reviewsData);
       setRecommendations(Array.isArray(recommendationsData) ? recommendationsData : []);
+      setInsights(insightsData);
 
       // clearTimeout(timeoutId);
       setLoading(false);
@@ -121,6 +127,8 @@ useEffect(() => {
   
   fetchData();
 }, [navigate]);
+
+
 
   // Product Handlers
   const handleProductChange = (e) => {
@@ -484,7 +492,8 @@ const generateProductSuggestions = async () => {
     users: '👥',
     personnel: '🚚',
     reviews: '⭐',
-    recommendations: '🎯'
+    recommendations: '🎯',
+    insights: '📊'
   };
   return icons[tab] || '';
 };
@@ -496,7 +505,8 @@ const generateProductSuggestions = async () => {
     users: Array.isArray(users) ? users.length : 0,
     personnel: Array.isArray(personnel) ? personnel.length : 0,
     reviews: Array.isArray(reviews) ? reviews.length : 0,
-    recommendations: Array.isArray(recommendations) ? recommendations.length : 0
+    recommendations: Array.isArray(recommendations) ? recommendations.length : 0,
+    insights: insights ? 1 : 0
   };
   return counts[tab] || 0;
 };
@@ -509,7 +519,7 @@ const generateProductSuggestions = async () => {
       <div className="admin-sidebar">
         <h2>🎛️ Admin Panel</h2>
         <ul>
-         {["products", "orders", "users", "personnel", "reviews", "recommendations"].map(tab => (
+         {["products", "orders", "users", "personnel", "reviews", "recommendations", "insights"].map(tab => (
             <li
               key={tab}
               className={activeTab === tab ? "active" : ""}
@@ -1322,6 +1332,7 @@ const generateProductSuggestions = async () => {
     </table>
   </div>
 )}
+{activeTab === "insights" && <AdminInsights />}
       </div>
     </div>
   );

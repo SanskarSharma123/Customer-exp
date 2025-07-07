@@ -49,12 +49,12 @@ const Login = ({ setIsLoggedIn, setUser }) => {
       
       // Redirect based on user role
       if (data.user.isAdmin) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        navigate("/admin");
-      } else {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        navigate("/dashboard");
-      }
+  localStorage.setItem("user", JSON.stringify(data.user));
+  setTimeout(() => navigate("/admin"), 100);
+} else {
+  localStorage.setItem("user", JSON.stringify(data.user));
+  setTimeout(() => navigate("/dashboard"), 100);
+}
     } catch (error) {
       setError(error.message);
     } finally {

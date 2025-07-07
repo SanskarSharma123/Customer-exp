@@ -2249,6 +2249,297 @@ app.get('/api/admin/orders', authenticateToken, isAdmin, async (req, res) => {
     res.status(500).json({ message: 'Server error fetching orders' });
   }
 });
+
+app.get('/api/admin/insights', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    // Sales Performance
+    const revenueResult = await pool.query(`
+      SELECT 
+        SUM(total_amount) AS total_revenue,
+        COUNT(*) AS total_orders,
+        AVG(total_amount) AS avg_order_value
+      FROM orders
+      WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+    `);
+    
+    // Revenue Trend (last 7 days) - Enhanced
+    const trendResult = await pool.query(`
+      SELECT 
+        DATE(created_at) AS period,
+        SUM(total_amount) AS revenue,
+        COUNT(*) AS orders
+      FROM orders
+      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at)
+    `);
+    
+    // Top Products - Fixed: removed p.subcategory_id references
+    const productsResult = await pool.query(`
+  SELECT 
+    p.name,
+    SUM(oi.quantity) AS quantity,
+    SUM(oi.quantity * oi.price) AS revenue,
+    COUNT(DISTINCT o.user_id) AS unique_buyers,
+    c.name AS category_name,
+    s.name AS subcategory_name
+  FROM order_items oi
+  JOIN products p ON oi.product_id = p.product_id
+  JOIN orders o ON oi.order_id = o.order_id
+  JOIN categories c ON p.category_id = c.category_id
+  LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+  LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+  WHERE o.created_at >= CURRENT_DATE - INTERVAL '30 days'
+  GROUP BY p.product_id, p.name, c.name, s.name
+  ORDER BY revenue DESC
+  LIMIT 5
+`);
+    
+    // User Engagement - Enhanced
+    const usersResult = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') AS new_users_7d,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') AS new_users_30d,
+        COUNT(DISTINCT user_id) AS total_users
+      FROM users
+    `);
+    
+    // Active Users (based on orders)
+    const activeUsersResult = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT user_id) AS active_users_30d,
+        COUNT(DISTINCT user_id) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') AS active_users_7d
+      FROM orders
+      WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+    `);
+    
+    // Retention Rate (users who made orders in both periods)
+    const retentionResult = await pool.query(`
+      WITH recent_buyers AS (
+        SELECT DISTINCT user_id 
+        FROM orders 
+        WHERE created_at BETWEEN CURRENT_DATE - INTERVAL '30 days' AND CURRENT_DATE
+      ),
+      previous_buyers AS (
+        SELECT DISTINCT user_id 
+        FROM orders 
+        WHERE created_at BETWEEN CURRENT_DATE - INTERVAL '60 days' AND CURRENT_DATE - INTERVAL '30 days'
+      )
+      SELECT 
+        COUNT(rb.user_id) * 100.0 / GREATEST(COUNT(pb.user_id), 1) AS retention_rate
+      FROM previous_buyers pb
+      LEFT JOIN recent_buyers rb ON pb.user_id = rb.user_id
+    `);
+    
+    // Geographical Distribution - Enhanced with state/city info
+    const locationsResult = await pool.query(`
+      SELECT 
+        a.city,
+        a.state,
+        a.latitude,
+        a.longitude,
+        COUNT(*) AS count,
+        SUM(o.total_amount) AS total_value
+      FROM orders o
+      JOIN addresses a ON o.address_id = a.address_id
+      WHERE a.latitude IS NOT NULL AND a.longitude IS NOT NULL
+      GROUP BY a.city, a.state, a.latitude, a.longitude
+      ORDER BY count DESC
+    `);
+    
+    // Order Status Distribution
+    const statusResult = await pool.query(`
+      SELECT 
+        status,
+        COUNT(*) AS count,
+        COUNT(*) * 100.0 / SUM(COUNT(*)) OVER () AS percentage
+      FROM orders
+      GROUP BY status
+      ORDER BY count DESC
+    `);
+    
+    // Inventory Health - Enhanced
+    const inventoryResult = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE stock_quantity = 0) AS out_of_stock,
+        COUNT(*) FILTER (WHERE stock_quantity > 0 AND stock_quantity <= 10) AS low_stock,
+        COUNT(*) FILTER (WHERE stock_quantity > 10) AS healthy_stock,
+        AVG(stock_quantity) AS avg_stock
+      FROM products
+    `);
+    
+    // Low Stock Products - Fixed: removed p.subcategory_id references
+    const lowStockResult = await pool.query(`
+  SELECT 
+    p.name, 
+    p.stock_quantity, 
+    p.unit,
+    p.price,
+    p.category_id,
+    c.name AS category_name,
+    s.name AS subcategory_name
+  FROM products p
+  JOIN categories c ON p.category_id = c.category_id
+  LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+  LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
+  WHERE p.stock_quantity <= 10
+  ORDER BY p.stock_quantity ASC, p.name
+  LIMIT 10
+`);
+    
+    // Calculate map boundaries
+    const coordsResult = await pool.query(`
+      SELECT 
+        MIN(latitude) AS min_lat, 
+        MAX(latitude) AS max_lat,
+        MIN(longitude) AS min_lon,
+        MAX(longitude) AS max_lon
+      FROM addresses
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        AND latitude BETWEEN 6 AND 38
+        AND longitude BETWEEN 68 AND 98
+    `);
+    
+    // Top Cities - Enhanced
+    const citiesResult = await pool.query(`
+      SELECT 
+        a.city,
+        a.state,
+        COUNT(*) AS count,
+        SUM(o.total_amount) AS revenue
+      FROM orders o
+      JOIN addresses a ON o.address_id = a.address_id
+      GROUP BY a.city, a.state
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+    
+    // Monthly Revenue Trend (last 6 months)
+    const monthlyTrendResult = await pool.query(`
+      SELECT 
+        DATE_TRUNC('month', created_at) AS month,
+        SUM(total_amount) AS revenue,
+        COUNT(*) AS orders
+      FROM orders
+      WHERE created_at >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY month
+    `);
+    
+    // Peak Hours Analysis
+    const peakHoursResult = await pool.query(`
+      SELECT 
+        EXTRACT(HOUR FROM created_at) AS hour,
+        COUNT(*) AS orders
+      FROM orders
+      WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY EXTRACT(HOUR FROM created_at)
+      ORDER BY hour
+    `);
+    
+    // Format and combine data
+    const insights = {
+      // Sales Performance
+      totalRevenue: parseFloat(revenueResult.rows[0]?.total_revenue) || 0,
+      totalOrders: parseInt(revenueResult.rows[0]?.total_orders) || 0,
+      avgOrderValue: parseFloat(revenueResult.rows[0]?.avg_order_value) || 0,
+      
+      // Revenue Trends
+      revenueTrend: trendResult.rows.map(row => ({
+        period: row.period,
+        revenue: parseFloat(row.revenue),
+        orders: parseInt(row.orders)
+      })),
+      maxRevenue: Math.max(...trendResult.rows.map(r => parseFloat(r.revenue)), 0),
+      
+      // Monthly Trends
+      monthlyTrend: monthlyTrendResult.rows.map(row => ({
+        month: row.month,
+        revenue: parseFloat(row.revenue),
+        orders: parseInt(row.orders)
+      })),
+      
+      // Products
+      topProducts: productsResult.rows.map(row => ({
+        name: row.name,
+        quantity: parseInt(row.quantity),
+        revenue: parseFloat(row.revenue),
+        uniqueBuyers: parseInt(row.unique_buyers),
+        categoryName: row.category_name,
+        subcategoryName: row.subcategory_name
+      })),
+      
+      // Users
+      newUsers: parseInt(usersResult.rows[0]?.new_users_7d) || 0,
+      newUsers30d: parseInt(usersResult.rows[0]?.new_users_30d) || 0,
+      totalUsers: parseInt(usersResult.rows[0]?.total_users) || 0,
+      activeUsers: parseInt(activeUsersResult.rows[0]?.active_users_30d) || 0,
+      activeUsers7d: parseInt(activeUsersResult.rows[0]?.active_users_7d) || 0,
+      retentionRate: parseFloat(retentionResult.rows[0]?.retention_rate) || 0,
+      
+      // Geography
+      deliveryLocations: locationsResult.rows.map(row => ({
+        city: row.city,
+        state: row.state,
+        latitude: parseFloat(row.latitude),
+        longitude: parseFloat(row.longitude),
+        count: parseInt(row.count),
+        totalValue: parseFloat(row.total_value)
+      })),
+      
+      // Order Status
+      orderStatus: statusResult.rows.reduce((acc, row) => {
+  acc[row.status] = parseInt(row.count);
+  return acc;
+}, {}),
+      
+      // Inventory
+      lowStockItems: parseInt(inventoryResult.rows[0]?.low_stock) || 0,
+      outOfStockItems: parseInt(inventoryResult.rows[0]?.out_of_stock) || 0,
+      healthyStockItems: parseInt(inventoryResult.rows[0]?.healthy_stock) || 0,
+      avgStock: parseFloat(inventoryResult.rows[0]?.avg_stock) || 0,
+      
+      lowStockProducts: lowStockResult.rows.map(row => ({
+        name: row.name,
+        stock_quantity: parseInt(row.stock_quantity),
+        unit: row.unit,
+        price: parseFloat(row.price),
+        category_id: row.category_id,
+        categoryName: row.category_name,
+        subcategoryName: row.subcategory_name
+      })),
+      
+      // Map boundaries
+      minLat: parseFloat(coordsResult.rows[0]?.min_lat) || 6,
+      maxLat: parseFloat(coordsResult.rows[0]?.max_lat) || 38,
+      minLon: parseFloat(coordsResult.rows[0]?.min_lon) || 68,
+      maxLon: parseFloat(coordsResult.rows[0]?.max_lon) || 98,
+      
+      // Top Cities
+      topCities: citiesResult.rows.map(row => ({
+        city: row.city,
+        state: row.state,
+        count: parseInt(row.count),
+        revenue: parseFloat(row.revenue)
+      })),
+      
+      // Peak Hours
+      peakHours: peakHoursResult.rows.map(row => ({
+        hour: parseInt(row.hour),
+        orders: parseInt(row.orders)
+      }))
+    };
+    
+    res.json(insights);
+  } catch (error) {
+    console.error('Insights error:', error);
+    res.status(500).json({ 
+      message: 'Server error fetching insights',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 app.get('/api/admin/delivery-personnel', authenticateToken, isAdmin, async (req, res) => {
   try {
     const available = req.query.available === 'true';

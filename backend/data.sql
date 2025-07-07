@@ -805,3 +805,15 @@ INSERT INTO cart_items (cart_id, product_id, quantity) VALUES
 UPDATE users
 SET is_admin = TRUE
 WHERE name = 'Sanskar Sharma';
+
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS min_price DECIMAL(10, 2),
+ADD COLUMN IF NOT EXISTS max_price DECIMAL(10, 2);
+
+-- Initialize min_price as price/2 and max_price as 2*price
+UPDATE products
+SET min_price = price / 2,
+    max_price = price * 2
+WHERE min_price IS NULL OR max_price IS NULL;
+
+SELECT * from products;

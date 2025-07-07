@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const Groq = require('groq-sdk');
+const { spawn } = require('child_process');
 require('dotenv').config();
 
 
@@ -2902,7 +2903,229 @@ app.put('/api/addresses/:addressId', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error updating address' });
   }
 });
+app.post('/api/admin/dynamic-pricing/preview', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    // Call Python script
+    const pythonProcess = spawn('python', ['dynamic_pricing.py']);
+    
+    let pythonOutput = '';
+    let pythonError = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      pythonOutput += data.toString();
+    });
 
+    pythonProcess.stderr.on('data', (data) => {
+      pythonError += data.toString();
+      console.error('Python error:', data.toString());
+    });
+
+    pythonProcess.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('Python process exited with code:', code);
+        console.error('Python error output:', pythonError);
+        return res.status(500).json({ message: 'Error running pricing model' });
+      }
+
+      try {
+        // Clean the output - remove any extra whitespace or non-JSON content
+        const cleanOutput = pythonOutput.trim();
+        
+        // Find the JSON part (should be the last complete JSON object)
+        let jsonStart = cleanOutput.lastIndexOf('[');
+        if (jsonStart === -1) {
+          jsonStart = cleanOutput.lastIndexOf('{');
+        }
+        
+        if (jsonStart === -1) {
+          throw new Error('No valid JSON found in Python output');
+        }
+        
+        const jsonOutput = cleanOutput.substring(jsonStart);
+        console.log('Attempting to parse JSON:', jsonOutput.substring(0, 200) + '...');
+        
+        const newPrices = JSON.parse(jsonOutput);
+
+        if (!Array.isArray(newPrices) || newPrices.length === 0) {
+          throw new Error('Invalid pricing data format received');
+        }
+
+        // Fetch current product data to show comparison
+        const client = await pool.connect();
+        try {
+          const currentProducts = await client.query('SELECT product_id, name, price FROM products');
+          const productsMap = {};
+          currentProducts.rows.forEach(product => {
+            productsMap[product.product_id] = product;
+          });
+
+          // Create preview data with current vs new prices
+          const previewData = newPrices.map(priceData => {
+  const product = productsMap[priceData.product_id];
+  const currentPrice = product ? parseFloat(product.price) : 0;
+  const newPrice = parseFloat(priceData.new_price);
+  const change = newPrice - currentPrice;
+  const changePercent = currentPrice > 0 ? ((change / currentPrice) * 100) : 0;
+
+  return {
+    product_id: priceData.product_id,
+    product_name: product?.name || 'Unknown',
+    current_price: currentPrice,
+    new_price: newPrice,
+    change: Math.round(change * 100) / 100,
+    change_percent: Math.round(changePercent * 100) / 100,
+    total_sales: priceData.total_sales || 0,
+    avg_rating: priceData.avg_rating || 0,
+    avg_sentiment: priceData.avg_sentiment || 0,
+
+    confidence_score: priceData.confidence_score ?? null,
+    market_segment: priceData.market_segment ?? 'unknown',
+    expected_revenue_change: priceData.expected_revenue_change ?? null,
+
+    // ✅ New field
+    algorithm: priceData.algorithm || 'Unknown'
+  };
+});
+
+          // Sort by change percentage (descending) to show most significant changes first
+          previewData.sort((a, b) => Math.abs(b.change_percent) - Math.abs(a.change_percent));
+
+          console.log(`Successfully generated preview for ${previewData.length} products`);
+          
+          res.json({
+            success: true,
+            data: previewData,
+            total_products: previewData.length,
+            summary: {
+              price_increases: previewData.filter(p => p.change > 0).length,
+              price_decreases: previewData.filter(p => p.change < 0).length,
+              no_change: previewData.filter(p => p.change === 0).length
+            }
+          });
+        } finally {
+          client.release();
+        }
+      } catch (error) {
+        console.error('Error processing pricing data:', error);
+        console.error('Raw Python output:', pythonOutput);
+        res.status(500).json({ 
+          message: 'Error processing pricing preview',
+          error: error.message,
+          debug: process.env.NODE_ENV === 'development' ? {
+            pythonOutput: pythonOutput.substring(0, 500),
+            pythonError: pythonError.substring(0, 500)
+          } : undefined
+        });
+      }
+    });
+
+    // Handle process errors
+    pythonProcess.on('error', (error) => {
+      console.error('Python process error:', error);
+      res.status(500).json({ message: 'Failed to start pricing model' });
+    });
+
+    // Set a timeout to prevent hanging
+    setTimeout(() => {
+      if (!res.headersSent) {
+        pythonProcess.kill();
+        res.status(500).json({ message: 'Pricing calculation timeout' });
+      }
+    }, 30000); // 30 second timeout
+
+  } catch (error) {
+    console.error('Dynamic pricing preview error:', error);
+    res.status(500).json({ message: 'Server error during pricing preview' });
+  }
+});
+app.post('/api/admin/dynamic-pricing/apply', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    // Call Python script
+    const pythonProcess = spawn('python', ['dynamic_pricing.py']);
+    
+    let pythonOutput = '';
+    pythonProcess.stdout.on('data', (data) => {
+      pythonOutput += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      console.error('Python error:', data.toString());
+    });
+
+    pythonProcess.on('close', async (code) => {
+      if (code !== 0) {
+        return res.status(500).json({ message: 'Error running pricing model' });
+      }
+
+      try {
+        const newPrices = JSON.parse(pythonOutput);
+
+        // Update prices in the database
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          
+          for (const { product_id, new_price } of newPrices) {
+            // First, get the current product to calculate discount relationship
+            const currentProduct = await client.query(
+              'SELECT price, discount_price FROM products WHERE product_id = $1',
+              [product_id]
+            );
+            
+            if (currentProduct.rows.length === 0) {
+              console.warn(`Product with ID ${product_id} not found`);
+              continue;
+            }
+            
+            const { price: currentPrice, discount_price: currentDiscountPrice } = currentProduct.rows[0];
+            
+            // Calculate new discount price maintaining the same discount relationship
+            let newDiscountPrice = null;
+            
+            if (currentDiscountPrice !== null && currentPrice > 0) {
+              // Calculate discount percentage from original price
+              const discountPercentage = (currentPrice - currentDiscountPrice) / currentPrice;
+              
+              // Apply same discount percentage to new price
+              newDiscountPrice = new_price * (1 - discountPercentage);
+              
+              // Round to 2 decimal places
+              newDiscountPrice = Math.round(newDiscountPrice * 100) / 100;
+              
+              // Ensure discount price is not higher than new price
+              if (newDiscountPrice >= new_price) {
+                newDiscountPrice = new_price * 0.95; // Apply 5% discount as minimum
+              }
+            }
+            
+            // Update both price and discount_price
+            await client.query(
+              'UPDATE products SET price = $1, discount_price = $2 WHERE product_id = $3',
+              [new_price, newDiscountPrice, product_id]
+            );
+          }
+          
+          await client.query('COMMIT');
+          
+          // Fetch updated products
+          const updatedProducts = await client.query('SELECT * FROM products ORDER BY product_id');
+          res.json(updatedProducts.rows);
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      } catch (error) {
+        console.error('Error processing pricing data:', error);
+        res.status(500).json({ message: 'Error updating prices' });
+      }
+    });
+  } catch (error) {
+    console.error('Dynamic pricing error:', error);
+    res.status(500).json({ message: 'Server error during dynamic pricing' });
+  }
+});
 // Update delivery location (for delivery personnel app)
 app.post('/api/orders/:orderId/location', authenticateToken, async (req, res) => {
   try {

@@ -345,7 +345,7 @@ app.get('/api/subcategories/:categoryId', async (req, res) => {
   }
 });
 
-app.post('/api/products/similar-in-subcategories', async (req, res) => {
+app.post('similar-in-subcategories', async (req, res) => {
   try {
     const { subcategory_ids, exclude_product_ids, category_id } = req.body;
     if (!Array.isArray(subcategory_ids) || subcategory_ids.length === 0) {
@@ -388,11 +388,15 @@ app.get('/api/products/category/:categoryId', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
       WHERE p.category_id = $1
-      GROUP BY p.product_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `, [categoryId]);
     res.json(products.rows);
   } catch (error) {
@@ -407,11 +411,15 @@ app.get('/api/products/featured', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
       WHERE p.is_featured = TRUE
-      GROUP BY p.product_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `);
     res.json(products.rows);
   } catch (error) {
@@ -427,11 +435,15 @@ app.get('/api/products/search', async (req, res) => {
     const products = await pool.query(`
       SELECT p.*, 
         COALESCE(ROUND(AVG(r.rating), 1), 0) as average_rating,
-        COUNT(r.review_id) as review_count
+        COUNT(r.review_id) as review_count,
+        ps.subcategory_id,
+        s.name as subcategory_name
       FROM products p
       LEFT JOIN reviews r ON p.product_id = r.product_id
+      LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+      LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
       WHERE p.name ILIKE $1 OR p.description ILIKE $2
-      GROUP BY p.product_id
+      GROUP BY p.product_id, ps.subcategory_id, s.name
     `, [searchTerm, searchTerm]);
     res.json(products.rows);
   } catch (error) {
@@ -1147,11 +1159,15 @@ app.get('/api/products/category/:categoryId', async (req, res) => {
       const products = await pool.query(`
           SELECT p.*, 
                  COALESCE(ROUND(AVG(r.rating)::numeric, 0) as average_rating,
-                 COUNT(r.review_id) as review_count
+                 COUNT(r.review_id) as review_count,
+                  ps.subcategory_id,
+                  s.name as subcategory_name
           FROM products p
           LEFT JOIN reviews r ON p.product_id = r.product_id
+          LEFT JOIN product_subcategories ps ON p.product_id = ps.product_id
+          LEFT JOIN subcategories s ON ps.subcategory_id = s.subcategory_id
           WHERE p.category_id = $1
-          GROUP BY p.product_id
+          GROUP BY p.product_id, ps.subcategory_id, s.name
       `, [categoryId]);
       res.json(products.rows);
   } catch (error) {

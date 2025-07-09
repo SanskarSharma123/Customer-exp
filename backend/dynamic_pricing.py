@@ -80,7 +80,10 @@ class ImprovedDynamicPricing:
                     COALESCE(SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN oi.quantity ELSE 0 END), 0) as sales_last_7_days,
                     COALESCE(SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '30 days' THEN oi.quantity ELSE 0 END), 0) as sales_last_30_days,
                     COALESCE(COUNT(CASE WHEN r.created_at >= CURRENT_DATE - INTERVAL '30 days' THEN r.review_id END), 0) as recent_reviews,
-                    
+                   COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '1 hour' THEN o.user_id END), 0) as unique_customers_last_hour,
+COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 hours' THEN o.user_id END), 0) as unique_customers_last_24h,
+        COALESCE(SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '1 hour' THEN oi.quantity ELSE 0 END), 0) as orders_last_hour,
+        COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '1 hour' THEN o.order_id END), 0) as order_count_last_hour,
                     -- Product age in days
                     (CURRENT_DATE::date - p.created_at::date) as product_age_days
                     
@@ -175,13 +178,16 @@ class ImprovedDynamicPricing:
             df = pd.DataFrame([dict(record) for record in records])
             
             # Convert numeric columns
+            # Convert numeric columns
             numeric_columns = [
                 'price', 'min_price', 'max_price', 'stock_quantity', 'avg_rating', 'rating_std',
-                'review_count', 'avg_sentiment', 'sentiment_std', 'total_sales', 'order_count',
+                'review_count', 'avg_sentiment', 'sentiment_2', 'total_sales', 'order_count',
                 'avg_order_quantity', 'sales_last_7_days', 'sales_last_30_days', 'recent_reviews',
                 'product_age_days', 'category_avg_price', 'category_price_std', 'category_q1_price',
                 'category_q3_price', 'price_z_score', 'sales_vs_category', 'inventory_turnover',
-                'sales_trend', 'price_deviation'
+                'sales_trend', 'price_deviation',
+                # ADD THESE NEW COLUMNS:
+                'unique_customers_last_hour', 'unique_customers_last_24h', 'orders_last_hour', 'order_count_last_hour'
             ]
             
             for col in numeric_columns:
@@ -293,6 +299,22 @@ class ImprovedDynamicPricing:
             0, 1
         )
         
+        # ADD THESE NEW FEATURES HERE:
+        # Real-time demand pressure
+        df['demand_pressure'] = np.where(
+            df['unique_customers_last_hour'] > 1,
+            np.log1p(df['unique_customers_last_hour']) * 0.3 + 
+            np.log1p(df['orders_last_hour']) * 0.2,
+            0
+        )
+        
+        # Demand velocity (how fast demand is growing)
+        df['demand_velocity'] = np.where(
+            df['unique_customers_last_24h'] > 0,
+            (df['unique_customers_last_hour'] * 24) / (df['unique_customers_last_24h'] + 1),
+            0
+        )
+        
         return df
 
     def prepare_ml_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
@@ -306,7 +328,9 @@ class ImprovedDynamicPricing:
             'inventory_turnover', 'sales_trend', 'price_deviation',
             'quality_score', 'market_position', 'demand_signal',
             'competitive_pressure', 'inventory_health', 'product_maturity',
-            'relative_performance', 'market_confidence', 'stock_quantity'
+            'relative_performance', 'market_confidence', 'stock_quantity',
+            # ADD THESE NEW FEATURES:
+            'demand_pressure', 'demand_velocity', 'unique_customers_last_hour', 'unique_customers_last_24h'
         ]
         
         # Add categorical features as dummy variables
@@ -605,15 +629,26 @@ class ImprovedDynamicPricing:
             adjustments['trend'] = max(-0.05, (sales_trend - 0.7) * 0.05)
         else:
             adjustments['trend'] = 0
+
+        if row['unique_customers_last_hour'] >= 2:
+    # Multiple users ordering same product = increase price
+            demand_multiplier = min(2.0, row['unique_customers_last_hour'] / 2)
+            adjustments['real_time_demand'] = min(0.15, demand_multiplier * 0.05)
+        elif row['demand_velocity'] > 2:
+            # Growing demand = moderate increase
+            adjustments['real_time_demand'] = min(0.08, (row['demand_velocity'] - 2) * 0.02)
+        else:
+            adjustments['real_time_demand'] = 0
         
         # Combine adjustments with weights
         weights = {
-            'quality': 0.25,
-            'position': 0.30,
-            'demand': 0.20,
+            'quality': 0.20,
+            'position': 0.25,
+            'demand': 0.15,
             'inventory': 0.10,
             'competition': 0.10,
-            'trend': 0.05
+            'trend': 0.05,
+            'real_time_demand': 0.5
         }
         
         total_adjustment = sum(adjustments[k] * weights[k] for k in adjustments.keys())

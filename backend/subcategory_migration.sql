@@ -78,7 +78,127 @@ WHERE name ILIKE ANY (ARRAY['%cucumber%', '%okra%', '%brinjal%', '%capsicum%', '
 
 -- Repeat similar UPDATEs for other categories as needed.
 -- For more precise mapping, you may want to manually review and adjust the assignments.
+-- Dairy & Eggs (category_id = 2) Updates
 
+-- Milk & Milk Drinks
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 2 AND name = 'Milk & Milk Drinks')
+WHERE name ILIKE ANY (ARRAY[
+  '%milk%', '%milkshake%', '%lassi%', '%buttermilk%', '%chaach%', '%protein drink%'
+]);
+
+-- Cheese & Paneer
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 2 AND name = 'Cheese & Paneer')
+WHERE name ILIKE ANY (ARRAY[
+  '%cheese%', '%paneer%', '%quark%'
+]);
+
+-- Butter, Ghee & Cream
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 2 AND name = 'Butter, Ghee & Cream')
+WHERE name ILIKE ANY (ARRAY[
+  '%butter%', '%ghee%', '%cream%'
+]);
+
+-- Yogurt & Curd
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 2 AND name = 'Yogurt & Curd')
+WHERE name ILIKE ANY (ARRAY[
+  '%dahi%', '%curd%', '%yogurt%'
+]);
+
+-- Eggs
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 2 AND name = 'Eggs')
+WHERE name ILIKE ANY (ARRAY[
+  '%egg%'
+]);
+
+-- Ice Cream & Sweets
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 2 AND name = 'Ice Cream & Sweets')
+WHERE name ILIKE ANY (ARRAY[
+  '%ice cream%', '%mithai mate%', '%condensed milk%'
+]);
+
+-- Bakery (category_id = 3) Updates
+
+-- Breads
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 3 AND name = 'Breads')
+WHERE name ILIKE ANY (ARRAY[
+  '%bread%', '%pav%', '%bun%', '%brioche%', '%focaccia%', '%sourdough%'
+]);
+
+-- Cakes & Pastries
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 3 AND name = 'Cakes & Pastries')
+WHERE name ILIKE ANY (ARRAY[
+  '%cake%', '%cupcake%', '%brownie%', '%croissant%', '%muffin%', '%danish%', '%doughnut%', '%cinnamon roll%', '%pastry%'
+]);
+
+-- Biscuits & Cookies
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 3 AND name = 'Biscuits & Cookies')
+WHERE name ILIKE ANY (ARRAY[
+  '%biscuit%', '%cookie%', '%rusk%', '%marie%', '%parle g%'
+]);
+
+-- Savory Baked Goods
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 3 AND name = 'Savory Baked Goods')
+WHERE name ILIKE ANY (ARRAY[
+  '%garlic bread%', '%burger bun%', '%bun pao%'
+]);
+
+-- Snacks & Beverages (category_id = 4) Updates
+
+-- Chips & Namkeen
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 4 AND name = 'Chips & Namkeen')
+WHERE name ILIKE ANY (ARRAY[
+  '%lays%', '%chips%', '%bingo%', '%kurkure%', '%uncle chips%', '%pringles%', '%bhujia%', '%sev%', '%nuts%', '%moong dal%', '%aloo bhujia%', '%tedhe medhe%', '%mad angles%', '%popcorn%'
+]);
+
+-- Chocolates & Sweets
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 4 AND name = 'Chocolates & Sweets')
+WHERE name ILIKE ANY (ARRAY[
+  '%cadbury%', '%dairy milk%', '%5 star%', '%gems%', '%chocolate%'
+]);
+
+-- Soft Drinks & Juices
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 4 AND name = 'Soft Drinks & Juices')
+WHERE name ILIKE ANY (ARRAY[
+  '%coca-cola%', '%pepsi%', '%sprite%', '%thums up%', '%7up%', '%mountain dew%', '%maaza%', '%minute maid%', '%frooti%'
+]);
+
+-- Biscuits & Cookies (for snacks category)
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 4 AND name = 'Biscuits & Cookies')
+WHERE name ILIKE ANY (ARRAY[
+  '%jim jam%'
+]) AND category_id = 4;
+
+-- Energy & Health Drinks
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 4 AND name = 'Energy & Health Drinks')
+WHERE name ILIKE ANY (ARRAY[
+  '%red bull%', '%bournvita%', '%nescafe%'
+]);
+
+-- Household (category_id = 5) Updates
+
+-- Cleaning Supplies
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 5 AND name = 'Cleaning Supplies')
+WHERE name ILIKE ANY (ARRAY[
+  '%vim%', '%harpic%', '%colin%', '%lizol%', '%dettol%', '%exo%', '%pril%', '%domex%', '%scotch brite%', '%genteel%', '%antiseptic%'
+]);
+
+-- Air Fresheners & Insect Repellents
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 5 AND name = 'Air Fresheners & Insect Repellents')
+WHERE name ILIKE ANY (ARRAY[
+  '%odonil%', '%good knight%', '%hit%', '%all out%', '%maxo%', '%aer%', '%air freshener%', '%mosquito%', '%repellent%'
+]);
+
+-- Laundry & Fabric Care
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 5 AND name = 'Laundry & Fabric Care')
+WHERE name ILIKE ANY (ARRAY[
+  '%surf excel%', '%ariel%', '%tide%', '%comfort%', '%rin%', '%ezee%', '%henko%', '%detergent%', '%washing%', '%fabric%'
+]);
+
+-- Kitchen & Household Accessories
+UPDATE products SET subcategory_id = (SELECT subcategory_id FROM subcategories WHERE category_id = 5 AND name = 'Kitchen & Household Accessories')
+WHERE name ILIKE ANY (ARRAY[
+  '%garbage bag%', '%toilet paper%', '%origami%', '%bags for u%', '%wipe%', '%scrubber%'
+]);
 -- =====================
 -- Subcategories for categories 6-10
 -- =====================
@@ -496,3 +616,6 @@ WHERE subcategory_id IS NOT NULL;
 
 -- 4. Remove the subcategory_id column from products table
 ALTER TABLE products DROP COLUMN subcategory_id;
+
+
+

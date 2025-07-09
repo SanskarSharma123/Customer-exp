@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+
 import asyncpg
 from typing import Dict, List, Tuple
 import asyncio
@@ -10,7 +11,10 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, r2_score
 import warnings
+import random
 warnings.filterwarnings('ignore')
+np.random.seed(42)
+random.seed(42)
 
 class ImprovedDynamicPricing:
     def __init__(self):
@@ -20,8 +24,8 @@ class ImprovedDynamicPricing:
             max_depth=10,
             min_samples_split=5,
             min_samples_leaf=2,
-            random_state=42,
-            n_jobs=-1
+            n_jobs=-1,
+            random_state=42
         )
         self.gb_model = GradientBoostingRegressor(
             n_estimators=100,
@@ -54,7 +58,7 @@ class ImprovedDynamicPricing:
             
             query = """
             WITH product_metrics AS (
-                SELECT 
+                SELECT CURRENT_TIMESTAMP as fetch_time,
                     p.product_id,
                     p.name,
                     p.price,
@@ -80,8 +84,8 @@ class ImprovedDynamicPricing:
                     COALESCE(SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN oi.quantity ELSE 0 END), 0) as sales_last_7_days,
                     COALESCE(SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '30 days' THEN oi.quantity ELSE 0 END), 0) as sales_last_30_days,
                     COALESCE(COUNT(CASE WHEN r.created_at >= CURRENT_DATE - INTERVAL '30 days' THEN r.review_id END), 0) as recent_reviews,
-                   COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '1 hour' THEN o.user_id END), 0) as unique_customers_last_hour,
-COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 hours' THEN o.user_id END), 0) as unique_customers_last_24h,
+                   COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= NOW() - INTERVAL '2 hours' THEN o.user_id END), 0) as unique_customers_last_hour,
+COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= NOW() - INTERVAL '48 hours' THEN o.user_id END), 0) as unique_customers_last_24h,
         COALESCE(SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '1 hour' THEN oi.quantity ELSE 0 END), 0) as orders_last_hour,
         COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '1 hour' THEN o.order_id END), 0) as order_count_last_hour,
                     -- Product age in days
@@ -151,10 +155,10 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
                 
                 -- Trend metrics (more conservative)
                 CASE 
-                    WHEN pm.sales_last_30_days > 0 
-                    THEN LEAST(pm.sales_last_7_days / (pm.sales_last_30_days / 4.0), 3.0)
-                    ELSE 1.0
-                END as sales_trend,
+    WHEN pm.sales_last_30_days > 0 
+    THEN LEAST(pm.sales_last_7_days / (pm.sales_last_30_days / 4.0), 2.0)
+    ELSE 1.0
+END as sales_trend,
                 
                 -- Competition density
                 CASE 
@@ -273,8 +277,8 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         df = df.copy()
         
         # Conservative interaction features
-        df['quality_score'] = (df['avg_rating'] * 0.6 + df['avg_sentiment'] * 0.4) / 10
-        df['market_position'] = df['price_z_score'] * 0.5  # Reduced weight
+        df['quality_score'] = np.clip((df['avg_rating'] * 0.6 + df['avg_sentiment'] * 0.4) / 10, 0.1, 0.9)
+        # df['market_position'] = df['price_z_score'] * 0.5  # Reduced weight
         df['demand_signal'] = np.log1p(df['total_sales']) * df['quality_score']
         
         # Competitive pressure (this should reduce prices when high)
@@ -310,10 +314,10 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         
         # Demand velocity (how fast demand is growing)
         df['demand_velocity'] = np.where(
-            df['unique_customers_last_24h'] > 0,
-            (df['unique_customers_last_hour'] * 24) / (df['unique_customers_last_24h'] + 1),
-            0
-        )
+    df['unique_customers_last_24h'] > 2,  # Only consider if meaningful data
+    np.clip((df['unique_customers_last_hour'] * 24) / (df['unique_customers_last_24h'] + 1), 0, 2),
+    0
+)
         
         return df
 
@@ -326,7 +330,7 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
             'category_avg_price', 'category_price_std', 'category_q1_price',
             'category_q3_price', 'price_z_score', 'sales_vs_category',
             'inventory_turnover', 'sales_trend', 'price_deviation',
-            'quality_score', 'market_position', 'demand_signal',
+            'quality_score', 
             'competitive_pressure', 'inventory_health', 'product_maturity',
             'relative_performance', 'market_confidence', 'stock_quantity',
             # ADD THESE NEW FEATURES:
@@ -365,7 +369,7 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         
         # Train-test split
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=0.2, random_state=42
+            X_scaled, y, test_size=0.2 , random_state=42 
         )
         
         models = {}
@@ -472,7 +476,7 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         return min(1.0, total_confidence)
 
     def calculate_hybrid_price(self, row: pd.Series, equilibrium: Dict, 
-                             ml_prediction: Dict = None) -> Dict:
+                         df: pd.DataFrame, ml_prediction: Dict = None) -> Dict:
         """Calculate price using hybrid approach: ML + market-aware logic"""
         current_price = float(row['price'])
         min_price = float(row['min_price'])
@@ -484,7 +488,7 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         optimal_range = segment_eq.get('optimal_price_range', (current_price * 0.9, current_price * 1.1))
         
         # Start with traditional approach
-        traditional_result = self.calculate_conservative_price(row, equilibrium)
+        traditional_result = self.calculate_conservative_price(row, equilibrium, df)
         
         # If ML prediction is available, combine approaches
         if ml_prediction and ml_prediction['chosen_prediction']:
@@ -557,15 +561,16 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
             }
         else:
             # Fallback to traditional approach
-            result = traditional_result.copy()
+            result = self.calculate_conservative_price(row, equilibrium, df)
             result['algorithm'] = 'Conservative Market-Aware (ML Failed)'
             result['ml_prediction'] = None
             result['best_model'] = 'None'
             return result
 
-    def calculate_conservative_price(self, row: pd.Series, equilibrium: Dict) -> Dict:
+    def calculate_conservative_price(self, row: pd.Series, equilibrium: Dict, df: pd.DataFrame) -> Dict:
         """Calculate price using conservative, market-aware approach"""
         current_price = float(row['price'])
+        # np.random.seed(int(row['product_id']))
         min_price = float(row['min_price'])
         max_price = float(row['max_price'])
         market_segment = row['market_segment']
@@ -576,81 +581,103 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         segment_elasticity = segment_eq.get('elasticity', -0.8)
         
         # Calculate individual adjustment factors
+        # Calculate individual adjustment factors
         adjustments = {}
-        
-        # 1. Quality-based adjustment (conservative)
+
+        # Check if this is a top-selling product in its category
+        category_products = df[df['category_id'] == row['category_id']]
+        if len(category_products) > 1:
+            sales_percentile = (category_products['total_sales'] < row['total_sales']).sum() / len(category_products)
+            is_top_seller = sales_percentile >= 0.5  # Top 50% of category
+        else:
+            is_top_seller = row['total_sales'] > 0
+
+        # Check for recent multi-user orders
+        has_recent_multi_user_orders = row['unique_customers_last_hour'] >= 2
+
+        # 1. Quality-based adjustment
         quality_score = row['quality_score']
         if quality_score > 0.7:
             adjustments['quality'] = min(0.05, (quality_score - 0.7) * 0.1)
-        elif quality_score < 0.5:
-            adjustments['quality'] = max(-0.08, (quality_score - 0.5) * 0.2)
+        elif quality_score < 0.4:  # Only decrease for very poor quality
+            adjustments['quality'] = max(-0.08, (quality_score - 0.4) * 0.2)
         else:
             adjustments['quality'] = 0
-        
-        # 2. Market position adjustment
-        if current_price < optimal_range[0]:
-            adjustments['position'] = min(0.10, (optimal_range[0] - current_price) / current_price)
-        elif current_price > optimal_range[1]:
-            adjustments['position'] = max(-0.12, (optimal_range[1] - current_price) / current_price)
+
+        # 2. Top seller premium (bias toward increases for top sellers)
+        if is_top_seller:
+            adjustments['top_seller_premium'] = min(0.12, sales_percentile * 0.15)
         else:
-            adjustments['position'] = 0
-        
-        # 3. Demand-based adjustment
+            adjustments['top_seller_premium'] = 0
+
+        # 3. Recent demand surge (strong positive signal)
+        if has_recent_multi_user_orders:
+            demand_multiplier = min(3.0, row['unique_customers_last_hour'] / 2)
+            adjustments['demand_surge'] = min(0.15, demand_multiplier * 0.06)
+        else:
+            adjustments['demand_surge'] = 0
+
+        # 4. Demand-based adjustment (allow decreases for poor performers)
         if row['total_sales'] > 0:
             relative_demand = row['relative_performance']
-            if relative_demand > 0.5:
-                adjustments['demand'] = min(0.06, relative_demand * 0.1)
-            elif relative_demand < -0.3:
-                adjustments['demand'] = max(-0.10, relative_demand * 0.2)
+            if relative_demand > 0.3 or is_top_seller:
+                # Top sellers or good performers get increases
+                adjustments['demand'] = min(0.08, relative_demand * 0.12)
+            elif relative_demand < -0.5:
+                # Only significantly poor performers get decreases
+                adjustments['demand'] = max(-0.10, relative_demand * 0.15)
             else:
                 adjustments['demand'] = 0
         else:
-            adjustments['demand'] = -0.05  # No sales = price too high
-        
-        # 4. Inventory adjustment
-        if row['inventory_health'] > 1.5:
-            adjustments['inventory'] = min(0.04, (row['inventory_health'] - 1.5) * 0.02)
-        elif row['inventory_health'] < 0.3 and row['stock_quantity'] > 0:
-            adjustments['inventory'] = max(-0.08, (row['inventory_health'] - 0.3) * 0.1)
+            # No sales = significant price decrease needed
+            adjustments['demand'] = -0.08
+
+        # 5. Inventory adjustment (prevent overstocking)
+        if row['inventory_health'] > 2.0:
+            adjustments['inventory'] = min(0.04, (row['inventory_health'] - 2.0) * 0.02)
+        elif row['inventory_health'] < 0.2 and row['stock_quantity'] > 10:
+            # Only decrease if significant overstock
+            adjustments['inventory'] = max(-0.08, (row['inventory_health'] - 0.2) * 0.15)
         else:
             adjustments['inventory'] = 0
-        
-        # 5. Competitive pressure adjustment
-        if row['competitive_pressure'] > 0.3:
-            adjustments['competition'] = max(-0.06, -row['competitive_pressure'] * 0.1)
-        else:
-            adjustments['competition'] = 0
-        
-        # 6. Trend adjustment (very conservative)
+
+        # 6. Sales trend adjustment
         sales_trend = row['sales_trend']
-        if sales_trend > 1.3:
-            adjustments['trend'] = min(0.03, (sales_trend - 1.3) * 0.02)
-        elif sales_trend < 0.7:
-            adjustments['trend'] = max(-0.05, (sales_trend - 0.7) * 0.05)
+        if sales_trend > 1.3 or (is_top_seller and sales_trend > 1.1):
+            adjustments['trend'] = min(0.05, (sales_trend - 1.1) * 0.03)
+        elif sales_trend < 0.6:  # Only decrease for significantly declining trends
+            adjustments['trend'] = max(-0.06, (sales_trend - 0.6) * 0.08)
         else:
             adjustments['trend'] = 0
 
-        if row['unique_customers_last_hour'] >= 2:
-    # Multiple users ordering same product = increase price
-            demand_multiplier = min(2.0, row['unique_customers_last_hour'] / 2)
-            adjustments['real_time_demand'] = min(0.15, demand_multiplier * 0.05)
-        elif row['demand_velocity'] > 2:
-            # Growing demand = moderate increase
-            adjustments['real_time_demand'] = min(0.08, (row['demand_velocity'] - 2) * 0.02)
+        # 7. Competitive pressure (only for non-top sellers)
+        if not is_top_seller and row['competitive_pressure'] > 0.4:
+            adjustments['competition'] = max(-0.05, -row['competitive_pressure'] * 0.08)
         else:
-            adjustments['real_time_demand'] = 0
+            adjustments['competition'] = 0
         
         # Combine adjustments with weights
-        weights = {
-            'quality': 0.20,
-            'position': 0.25,
-            'demand': 0.15,
-            'inventory': 0.10,
-            'competition': 0.10,
-            'trend': 0.05,
-            'real_time_demand': 0.5
-        }
-        
+        # Combine adjustments with weights (bias toward top sellers)
+        if is_top_seller or has_recent_multi_user_orders:
+            weights = {
+                'quality': 0.10,
+                'top_seller_premium': 0.25,
+                'demand_surge': 0.20,
+                'demand': 0.25,
+                'inventory': 0.05,
+                'trend': 0.10,
+                'competition': 0.05
+            }
+        else:
+            weights = {
+                'quality': 0.15,
+                'top_seller_premium': 0.05,
+                'demand_surge': 0.05,
+                'demand': 0.35,
+                'inventory': 0.15,
+                'trend': 0.15,
+                'competition': 0.10
+            }
         total_adjustment = sum(adjustments[k] * weights[k] for k in adjustments.keys())
         
         # Apply market confidence as a dampening factor
@@ -663,15 +690,23 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         elif abs(segment_elasticity) < 0.5:  # Inelastic
             total_adjustment *= 1.2
         
-        # Apply conservative constraints
+        # Apply constraints with bias toward top sellers
         max_increase = self.price_constraints['max_increase']
         max_decrease = self.price_constraints['max_decrease']
-        
-        # Reduce max increase for products with low confidence
-        if confidence_factor < 0.5:
-            max_increase *= 0.5
-        
+
+        # Increase max_increase for top sellers with high demand
+        if is_top_seller and has_recent_multi_user_orders:
+            max_increase = min(0.25, max_increase * 1.5)
+        elif is_top_seller:
+            max_increase = min(0.20, max_increase * 1.2)
+
+        # Reduce max_decrease for top sellers (they should rarely decrease)
+        if is_top_seller:
+            max_decrease = max_decrease * 0.5
+
         total_adjustment = np.clip(total_adjustment, -max_decrease, max_increase)
+        random_factor = 0
+        
         
         # Calculate final price
         new_price = current_price * (1 + total_adjustment)
@@ -684,6 +719,7 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
         
         # Calculate comprehensive confidence score
         confidence = self.calculate_comprehensive_confidence(row, adjustments, total_adjustment)
+        # total_adjustment += random_factor * confidence
         
         return {
             'product_id': int(row['product_id']),
@@ -700,7 +736,7 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
             'avg_rating': round(float(row['avg_rating']), 2),
             'avg_sentiment': round(float(row['avg_sentiment']), 2),
             'quality_score': round(float(row['quality_score']), 3),
-            'market_position': round(float(row['market_position']), 3),
+            # 'market_position': round(float(row['market_position']), 3),
             'expected_revenue_change': round((new_price - current_price) * max(row['sales_last_30_days'], 1), 2),
             'recommendation': self.get_recommendation(total_adjustment, confidence)
         }
@@ -780,10 +816,10 @@ COALESCE(COUNT(DISTINCT CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '24 ho
                 # Calculate final price using hybrid approach
                 if ml_prediction and ml_prediction['chosen_prediction']['confidence'] > 0.3:
                     # Use hybrid approach
-                    price_info = self.calculate_hybrid_price(row, equilibrium, ml_prediction)
+                    price_info = self.calculate_hybrid_price(row, equilibrium, df, ml_prediction)
                 else:
                     # Fallback to conservative approach
-                    price_info = self.calculate_conservative_price(row, equilibrium)
+                    price_info = self.calculate_conservative_price(row, equilibrium, df)
                     price_info['algorithm'] = algorithm_used
                     price_info['ml_prediction'] = None
                     price_info['best_model'] = 'None'

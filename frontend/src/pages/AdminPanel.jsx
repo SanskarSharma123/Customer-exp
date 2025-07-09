@@ -19,6 +19,7 @@ const AdminPanel = () => {
   const [reviews, setReviews] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [insights, setInsights] = useState(null);
+  const [showRecommendations, setShowRecommendations] = useState(false);
   const [newPersonnel, setNewPersonnel] = useState({
     name: '',
     email: '',
@@ -1256,9 +1257,416 @@ const handleApplyPricing = async () => {
         )}
 
         {activeTab === "recommendations" && (
+          
           <div className="recommendations-admin">
-            <h2>🎯 Product Recommendations</h2>
-            <table>
+            <div
+  className="dropdown-header"
+  onClick={() => setShowRecommendations(!showRecommendations)}
+  role="button"
+  tabIndex={0}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setShowRecommendations(!showRecommendations);
+    }
+  }}
+  aria-expanded={showRecommendations}
+  aria-controls="recommendations-content"
+>
+  <h2>
+    <span>{showRecommendations ? '▼' : '▶'}</span>
+    <span>🎯</span>
+    <span>Intelligent Product Recommendations</span>
+  </h2>
+</div>
+            
+{showRecommendations && (
+      <>
+<div className="recommendation-system-admin">
+    <div className="recommendation-info-section" style={{
+        padding: '24px',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
+        marginBottom: '20px',
+        color: '#333',
+    }}>
+        <h3 style={{
+            color: '#1a365d',
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            marginBottom: '1.5rem',
+            paddingBottom: '0.75rem',
+            borderBottom: '3px solid #3182ce',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+            🧠 Multi-Algorithm Recommendation Engine
+        </h3>
+
+        <ul style={{
+            marginLeft: '0px',
+            lineHeight: '1.8',
+            listStyle: 'none',
+            padding: '0',
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        }}>
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f8fafc',
+                borderLeft: '4px solid #3182ce',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Algorithms:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Content-based • Collaborative Filtering • Hybrid • Event-based • Seasonal
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f0fff4',
+                borderLeft: '4px solid #38a169',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Personalization:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Purchase history • Sentiment analysis • Category preferences • Price sensitivity
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#fffaf0',
+                borderLeft: '4px solid #ed8936',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Sentiment Analysis:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    AI-powered NLP • Rating-based fallback • Confidence scoring
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f7fafc',
+                borderLeft: '4px solid #805ad5',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>User Profiling:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Preferred categories • Avoided products • Price ranges • Sentiment profile
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    Core Recommendation Features:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#edf2f7',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e0'
+                    }}>
+                        <strong style={{ color: '#2b6cb0' }}>Content-Based Filtering:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Category preferences • Price sensitivity • Sentiment alignment
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#e6fffa',
+                        borderRadius: '6px',
+                        border: '1px solid #81e6d9'
+                    }}>
+                        <strong style={{ color: '#00a3c4' }}>Collaborative Filtering:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            User similarity • Purchase patterns • Time decay weighting
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#fef5e7',
+                        borderRadius: '6px',
+                        border: '1px solid #fbd38d'
+                    }}>
+                        <strong style={{ color: '#c05621' }}>Event-Based Recommendations:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Real-time context • Product interaction triggers • Caching system
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#f0f4ff',
+                        borderRadius: '6px',
+                        border: '1px solid #a3bffa'
+                    }}>
+                        <strong style={{ color: '#3c366b' }}>Seasonal Recommendations:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Month-based category mapping • Seasonal popularity scoring
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    User Profile Analysis:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0fff4',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #48bb78'
+                    }}>
+                        <strong style={{ color: '#22543d' }}>Purchase Statistics:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Total orders • Spending patterns • Product diversity
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f7fafc',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #4299e1'
+                    }}>
+                        <strong style={{ color: '#2a4365' }}>Sentiment Profile:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Average sentiment • Sentiment variance • Review confidence
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fffaf0',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #ed8936'
+                    }}>
+                        <strong style={{ color: '#744210' }}>Behavioral Patterns:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Preferred products • Avoided products • Category preferences
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0f4ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #805ad5'
+                    }}>
+                        <strong style={{ color: '#44337a' }}>Price Sensitivity:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Preferred range • Minimum spend • Maximum spend
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    Caching & Performance:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f7fafc',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #718096'
+                    }}>
+                        <strong style={{ color: '#2d3748' }}>User Profile Cache:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            5-minute TTL • Automatic invalidation
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#e6fffa',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #38b2ac'
+                    }}>
+                        <strong style={{ color: '#234e52' }}>Event Cache:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Context-specific recommendations • 5-minute TTL
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fffaf0',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #ed8936'
+                    }}>
+                        <strong style={{ color: '#744210' }}>Cache Invalidation:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            After orders • After reviews • Product changes
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0f4ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #805ad5'
+                    }}>
+                        <strong style={{ color: '#44337a' }}>Performance Optimization:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Database query optimization • Batch processing
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1.25rem',
+                backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                border: '1px solid #a78bfa',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(167, 139, 250, 0.2)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#553c9a', fontSize: '1.05rem' }}>Recommendation Types:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Personalized • Trending • Seasonal • Category-specific • Event-based
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '2px solid #f56565',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(245, 101, 101, 0.15)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#c53030', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    🛡️ Fallback Mechanisms:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>New User Strategy:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Trending + Best Selling + Highest Rated products
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Sentiment Fallback:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Rating-based sentiment when NLP unavailable
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Algorithm Redundancy:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Multiple recommendation strategies ensure coverage
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Error Handling:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Graceful degradation when components fail
+                        </span>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</div>
+            
+            </>
+             )}
+             <table>
               <thead>
                 <tr>
                   <th>User</th>
@@ -1341,427 +1749,491 @@ const handleApplyPricing = async () => {
           </div>
         )}
 {activeTab === "dynamic_pricing" && (
-  <div className="dynamic-pricing-admin">
+<div className="dynamic-pricing-admin">
     <h2>💰 Advanced Dynamic Pricing Engine</h2>
 
-    <div
-      className="pricing-info-section"
-      style={{
-  // background: 'white',
-  padding: '24px',
-  borderRadius: '12px',
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
-  marginBottom: '20px',
-  color: '#333',
-}}
-    >
-    <h3 style={{
-  color: '#1a365d',
-  fontSize: '1.5rem',
-  fontWeight: '700',
-  marginBottom: '1.5rem',
-  paddingBottom: '0.75rem',
-  borderBottom: '3px solid #3182ce',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  backgroundClip: 'text',
-  textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-}}>
-  🧠 Hybrid ML-Driven Pricing with Advanced Market Intelligence
-</h3>
-
-<ul style={{
-  marginLeft: '0px',
-  lineHeight: '1.8',
-  listStyle: 'none',
-  padding: '0',
-  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-}}>
-  <li style={{
-    marginBottom: '1rem',
-    padding: '1rem',
-    backgroundColor: '#f8fafc',
-    borderLeft: '4px solid #3182ce',
-    borderRadius: '0 8px 8px 0',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Model Selection:</strong> 
-    <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-      Random Forest (100 trees) vs Gradient Boosting (100 trees) chosen via performance metrics (R² + MAE)
-    </span>
-  </li>
-
-  <li style={{
-    marginBottom: '1rem',
-    padding: '1rem',
-    backgroundColor: '#f0fff4',
-    borderLeft: '4px solid #38a169',
-    borderRadius: '0 8px 8px 0',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Hybrid Pricing Logic:</strong> 
-    <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-      ML prediction weight (confidence-based) + Conservative market-aware logic (confidence-based)
-    </span>
-  </li>
-
-  <li style={{
-    marginBottom: '1rem',
-    padding: '1rem',
-    backgroundColor: '#fffaf0',
-    borderLeft: '4px solid #ed8936',
-    borderRadius: '0 8px 8px 0',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Adjustment Limits:</strong> 
-    <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-      Max increase: ±15% | Max decrease: ±20% | Confidence threshold: 0.3
-    </span>
-  </li>
-
-  <li style={{
-    marginBottom: '1rem',
-    padding: '1rem',
-    backgroundColor: '#f7fafc',
-    borderLeft: '4px solid #805ad5',
-    borderRadius: '0 8px 8px 0',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Confidence Score:</strong> 
-    <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-      Model performance (40%) + Prediction reasonableness (30%) + Data quality (20%) + Market confidence (10%)
-    </span>
-  </li>
-
-  <li style={{
-    marginBottom: '1.5rem',
-    padding: '1.25rem',
-    backgroundColor: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
-      Core ML Features (25+):
-    </strong>
-    <ul style={{
-      marginLeft: '0',
-      listStyle: 'none',
-      padding: '0'
+    <div className="pricing-info-section" style={{
+        padding: '24px',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
+        marginBottom: '20px',
+        color: '#333',
     }}>
-      <li style={{
-        marginBottom: '0.75rem',
-        padding: '0.75rem',
-        backgroundColor: '#edf2f7',
-        borderRadius: '6px',
-        border: '1px solid #cbd5e0'
-      }}>
-        <strong style={{ color: '#2b6cb0' }}>Quality Metrics:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Rating + Sentiment Score • Review Count + Recent Reviews • Quality Score (Combined)
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.75rem',
-        padding: '0.75rem',
-        backgroundColor: '#e6fffa',
-        borderRadius: '6px',
-        border: '1px solid #81e6d9'
-      }}>
-        <strong style={{ color: '#00a3c4' }}>Market Position:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Price Z-score vs Category • Sales vs Category Performance • Market Segment (Budget/Mid/Premium)
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.75rem',
-        padding: '0.75rem',
-        backgroundColor: '#fef5e7',
-        borderRadius: '6px',
-        border: '1px solid #fbd38d'
-      }}>
-        <strong style={{ color: '#c05621' }}>Competitive Intelligence:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Price Deviation from Category • Competitive Pressure Score • Category Quartile Position
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.5rem',
-        padding: '0.75rem',
-        backgroundColor: '#f0f4ff',
-        borderRadius: '6px',
-        border: '1px solid #a3bffa'
-      }}>
-        <strong style={{ color: '#3c366b' }}>Demand Signals:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Sales Trend (7d vs 30d) • Inventory Turnover Rate • Product Maturity Score
-        </span>
-      </li>
-    </ul>
-  </li>
+        <h3 style={{
+            color: '#1a365d',
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            marginBottom: '1.5rem',
+            paddingBottom: '0.75rem',
+            borderBottom: '3px solid #3182ce',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+            🧠 Hybrid ML-Driven Pricing with Advanced Market Intelligence
+        </h3>
 
-  <li style={{
-    marginBottom: '1.5rem',
-    padding: '1.25rem',
-    backgroundColor: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
-      Conservative Market-Aware Rules:
-    </strong>
-    <ul style={{
-      marginLeft: '0',
-      listStyle: 'none',
-      padding: '0'
-    }}>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#f0fff4',
-        borderRadius: '6px',
-        borderLeft: '3px solid #48bb78'
-      }}>
-        <strong style={{ color: '#22543d' }}>Quality Adjustment:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          High quality (&gt;0.7): +5% max | Low quality (&lt;0.5): -8% max
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#f7fafc',
-        borderRadius: '6px',
-        borderLeft: '3px solid #4299e1'
-      }}>
-        <strong style={{ color: '#2a4365' }}>Market Position:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Below optimal range: +10% max | Above optimal: -12% max
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#fffaf0',
-        borderRadius: '6px',
-        borderLeft: '3px solid #ed8936'
-      }}>
-        <strong style={{ color: '#744210' }}>Demand Performance:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          High performers (&gt;0.5): +6% max | Poor performers (&lt;-0.3): -10% max
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#f0f4ff',
-        borderRadius: '6px',
-        borderLeft: '3px solid #805ad5'
-      }}>
-        <strong style={{ color: '#44337a' }}>Inventory Health:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          High turnover (&gt;1.5): +4% max | Low turnover (&lt;0.3): -8% max
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#fed7e2',
-        borderRadius: '6px',
-        borderLeft: '3px solid #f56565'
-      }}>
-        <strong style={{ color: '#742a2a' }}>Competitive Pressure:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          High competition (&gt;0.3): -6% max pressure response
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.5rem',
-        padding: '0.6rem',
-        backgroundColor: '#e6fffa',
-        borderRadius: '6px',
-        borderLeft: '3px solid #38b2ac'
-      }}>
-        <strong style={{ color: '#234e52' }}>Sales Trends:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Strong trend (&gt;1.3): +3% max | Weak trend (&lt;0.7): -5% max
-        </span>
-      </li>
-    </ul>
-  </li>
+        <ul style={{
+            marginLeft: '0px',
+            lineHeight: '1.8',
+            listStyle: 'none',
+            padding: '0',
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        }}>
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f8fafc',
+                borderLeft: '4px solid #3182ce',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Model Selection:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Random Forest (100 trees, random_state=42) vs Gradient Boosting (100 trees, random_state=42)
+                </span>
+            </li>
 
-  <li style={{
-    marginBottom: '1rem',
-    padding: '1.25rem',
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-    border: '1px solid #a78bfa',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(167, 139, 250, 0.2)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#553c9a', fontSize: '1.05rem' }}>Market Equilibrium Calculation:</strong> 
-    <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-      Segment-based optimal price ranges from top-performing products (70th percentile) • Dynamic elasticity calculation per market segment (-2.0 to -0.2 range) • Confidence dampening based on market uncertainty
-    </span>
-  </li>
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f0fff4',
+                borderLeft: '4px solid #38a169',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Hybrid Pricing Logic:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    ML prediction weight (confidence-based) + Conservative market-aware logic (confidence-based)
+                </span>
+            </li>
 
-  <li style={{
-    marginBottom: '1.5rem',
-    padding: '1.25rem',
-    backgroundColor: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
-      Advanced Features:
-    </strong>
-    <ul style={{
-      marginLeft: '0',
-      listStyle: 'none',
-      padding: '0'
-    }}>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#f7fafc',
-        borderRadius: '6px',
-        borderLeft: '3px solid #718096'
-      }}>
-        <strong style={{ color: '#2d3748' }}>Robust Scaling:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          RobustScaler for outlier handling
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#e6fffa',
-        borderRadius: '6px',
-        borderLeft: '3px solid #38b2ac'
-      }}>
-        <strong style={{ color: '#234e52' }}>Model Confidence:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Weighted combination based on individual model performance
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#fffaf0',
-        borderRadius: '6px',
-        borderLeft: '3px solid #ed8936'
-      }}>
-        <strong style={{ color: '#744210' }}>Market Segment Elasticity:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Highly elastic (&gt;1.5): 0.7x dampening | Inelastic (&lt;0.5): 1.2x amplification
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#f0f4ff',
-        borderRadius: '6px',
-        borderLeft: '3px solid #805ad5'
-      }}>
-        <strong style={{ color: '#44337a' }}>Data Quality Weighting:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Products with sales history get higher confidence
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.5rem',
-        padding: '0.6rem',
-        backgroundColor: '#f0fff4',
-        borderRadius: '6px',
-        borderLeft: '3px solid #48bb78'
-      }}>
-        <strong style={{ color: '#22543d' }}>Fallback Logic:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Conservative approach when ML fails or low confidence
-        </span>
-      </li>
-    </ul>
-  </li>
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#fffaf0',
+                borderLeft: '4px solid #ed8936',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Adjustment Limits:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Max increase: ±15% | Max decrease: ±20% | Confidence threshold: 0.3
+                </span>
+            </li>
 
-  <li style={{
-    marginBottom: '1rem',
-    padding: '1.25rem',
-    backgroundColor: '#ffffff',
-    border: '2px solid #f56565',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(245, 101, 101, 0.15)',
-    transition: 'all 0.3s ease'
-  }}>
-    <strong style={{ color: '#c53030', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
-      🛡️ Safety Mechanisms:
-    </strong>
-    <ul style={{
-      marginLeft: '0',
-      listStyle: 'none',
-      padding: '0'
-    }}>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#fed7e2',
-        borderRadius: '6px',
-        borderLeft: '3px solid #f56565'
-      }}>
-        <strong style={{ color: '#742a2a' }}>Extreme Value Capping:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Sales trends (0.1-3.0), Z-scores (±3), Performance ratios (±2)
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#fed7e2',
-        borderRadius: '6px',
-        borderLeft: '3px solid #f56565'
-      }}>
-        <strong style={{ color: '#742a2a' }}>Minimum Change Threshold:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Adjustments &lt;₹0.01 are ignored
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.6rem',
-        padding: '0.6rem',
-        backgroundColor: '#fed7e2',
-        borderRadius: '6px',
-        borderLeft: '3px solid #f56565'
-      }}>
-        <strong style={{ color: '#742a2a' }}>Low Confidence Override:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          &lt;0.3 confidence forces price maintenance
-        </span>
-      </li>
-      <li style={{
-        marginBottom: '0.5rem',
-        padding: '0.6rem',
-        backgroundColor: '#fed7e2',
-        borderRadius: '6px',
-        borderLeft: '3px solid #f56565'
-      }}>
-        <strong style={{ color: '#742a2a' }}>Price Bounds:</strong> 
-        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
-          Strict adherence to min_price and max_price constraints
-        </span>
-      </li>
-    </ul>
-  </li>
-</ul>
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f7fafc',
+                borderLeft: '4px solid #805ad5',
+                borderRadius: '0 8px 8px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#2d3748', fontSize: '1.05rem' }}>Confidence Score:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Model performance (40%) + Prediction reasonableness (30%) + Data quality (20%) + Market confidence (10%)
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    Core ML Features (25+):
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#edf2f7',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e0'
+                    }}>
+                        <strong style={{ color: '#2b6cb0' }}>Quality Metrics:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Rating + Sentiment Score • Review Count + Recent Reviews • Quality Score (Combined)
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#e6fffa',
+                        borderRadius: '6px',
+                        border: '1px solid #81e6d9'
+                    }}>
+                        <strong style={{ color: '#00a3c4' }}>Market Position:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Price Z-score vs Category • Sales vs Category Performance • Market Segment (Budget/Mid/Premium)
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#fef5e7',
+                        borderRadius: '6px',
+                        border: '1px solid #fbd38d'
+                    }}>
+                        <strong style={{ color: '#c05621' }}>Competitive Intelligence:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Price Deviation from Category • Competitive Pressure Score • Category Quartile Position
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#f0f4ff',
+                        borderRadius: '6px',
+                        border: '1px solid #a3bffa'
+                    }}>
+                        <strong style={{ color: '#3c366b' }}>Demand Signals:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Sales Trend (7d vs 30d) • Inventory Turnover Rate • Product Maturity Score • Real-time Demand Pressure
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    Conservative Market-Aware Rules:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0fff4',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #48bb78'
+                    }}>
+                        <strong style={{ color: '#22543d' }}>Quality Adjustment:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            High quality (&gt;0.7): +5% max | Low quality (&lt;0.5): -8% max
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f7fafc',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #4299e1'
+                    }}>
+                        <strong style={{ color: '#2a4365' }}>Market Position:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Below optimal range: +10% max | Above optimal: -12% max
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fffaf0',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #ed8936'
+                    }}>
+                        <strong style={{ color: '#744210' }}>Demand Performance:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            High performers (&gt;0.5): +6% max | Poor performers (&lt;-0.3): -10% max
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0f4ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #805ad5'
+                    }}>
+                        <strong style={{ color: '#44337a' }}>Inventory Health:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            High turnover (&gt;1.5): +4% max | Low turnover (&lt;0.3): -8% max
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Competitive Pressure:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            High competition (&gt;0.3): -6% max pressure response
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#e6fffa',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #38b2ac'
+                    }}>
+                        <strong style={{ color: '#234e52' }}>Sales Trends:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Strong trend (&gt;1.3): +3% max | Weak trend (&lt;0.7): -5% max
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            {/* <!-- New Reproducibility Section --> */}
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#f0f4ff',
+                border: '2px solid #4299e1',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(66, 153, 225, 0.15)'
+            }}>
+                <strong style={{ color: '#2b6cb0', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    🔄 Enhanced Reproducibility:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#ebf8ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #63b3ed'
+                    }}>
+                        <strong style={{ color: '#2c5282' }}>Deterministic Execution:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            All random processes seeded (numpy, random, sklearn)
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#ebf8ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #63b3ed'
+                    }}>
+                        <strong style={{ color: '#2c5282' }}>Consistent Splitting:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Fixed random_state=42 in train/test splits
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#ebf8ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #63b3ed'
+                    }}>
+                        <strong style={{ color: '#2c5282' }}>Stable Predictions:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Identical results across runs with same data
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1.25rem',
+                backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                border: '1px solid #a78bfa',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(167, 139, 250, 0.2)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#553c9a', fontSize: '1.05rem' }}>Market Equilibrium Calculation:</strong> 
+                <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                    Segment-based optimal price ranges from top-performing products (70th percentile) • Dynamic elasticity calculation per market segment (-2.0 to -0.2 range) • Confidence dampening based on market uncertainty
+                </span>
+            </li>
+
+            <li style={{
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#1a202c', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    Advanced Features:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f7fafc',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #718096'
+                    }}>
+                        <strong style={{ color: '#2d3748' }}>Robust Scaling:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            RobustScaler for outlier handling
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#e6fffa',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #38b2ac'
+                    }}>
+                        <strong style={{ color: '#234e52' }}>Model Confidence:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Weighted combination based on individual model performance
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fffaf0',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #ed8936'
+                    }}>
+                        <strong style={{ color: '#744210' }}>Market Segment Elasticity:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Highly elastic (&gt;1.5): 0.7x dampening | Inelastic (&lt;0.5): 1.2x amplification
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0f4ff',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #805ad5'
+                    }}>
+                        <strong style={{ color: '#44337a' }}>Data Quality Weighting:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Products with sales history get higher confidence
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#f0fff4',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #48bb78'
+                    }}>
+                        <strong style={{ color: '#22543d' }}>Fallback Logic:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Conservative approach when ML fails or low confidence
+                        </span>
+                    </li>
+                </ul>
+            </li>
+
+            <li style={{
+                marginBottom: '1rem',
+                padding: '1.25rem',
+                backgroundColor: '#ffffff',
+                border: '2px solid #f56565',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(245, 101, 101, 0.15)',
+                transition: 'all 0.3s ease'
+            }}>
+                <strong style={{ color: '#c53030', fontSize: '1.1rem', display: 'block', marginBottom: '0.75rem' }}>
+                    🛡️ Safety Mechanisms:
+                </strong>
+                <ul style={{
+                    marginLeft: '0',
+                    listStyle: 'none',
+                    padding: '0'
+                }}>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Extreme Value Capping:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Sales trends (0.1-3.0), Z-scores (±3), Performance ratios (±2)
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Minimum Change Threshold:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Adjustments &lt;₹0.01 are ignored
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Low Confidence Override:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            &lt;0.3 confidence forces price maintenance
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.6rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Price Bounds:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Strict adherence to min_price and max_price constraints
+                        </span>
+                    </li>
+                    <li style={{
+                        marginBottom: '0.5rem',
+                        padding: '0.6rem',
+                        backgroundColor: '#fed7e2',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f56565'
+                    }}>
+                        <strong style={{ color: '#742a2a' }}>Reproducibility Guarantee:</strong> 
+                        <span style={{ color: '#4a5568', marginLeft: '0.5rem' }}>
+                            Fixed random seeds ensure consistent pricing between runs
+                        </span>
+                    </li>
+                </ul>
+            </li>
+        </ul>
 
 
     </div>

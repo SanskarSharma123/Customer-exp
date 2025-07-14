@@ -1436,10 +1436,10 @@ app.get('/api/orders/:orderId/tracking', authenticateToken, async (req, res) => 
       let currentLocation = null;
       if (order.status === 'out_for_delivery') {
         const locationResult = await client.query(`
-          SELECT latitude, longitude, created_at
+          SELECT latitude, longitude, timestamp
            FROM delivery_locations
            WHERE order_id = $1
-           ORDER BY created_at DESC
+           ORDER BY timestamp DESC
            LIMIT 1`,
           [orderId]
         );

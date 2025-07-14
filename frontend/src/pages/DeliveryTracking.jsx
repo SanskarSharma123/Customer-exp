@@ -520,9 +520,16 @@ const DeliveryTracking = () => {
         });
         
         if (!response.ok) {
-          const errorData = await response.json(); // Get error details
-          throw new Error(errorData.message || "Failed to fetch order details");
-        }
+  let errorMessage = "Failed to fetch order details";
+  try {
+    const errorData = await response.json();
+    errorMessage = errorData.message || errorMessage;
+  } catch (jsonError) {
+    // If JSON parsing fails, use the status text
+    errorMessage = response.statusText || errorMessage;
+  }
+  throw new Error(errorMessage);
+}
     
         const data = await response.json();
         console.log("Received order data:", data);

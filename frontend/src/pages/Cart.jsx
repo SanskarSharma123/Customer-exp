@@ -518,20 +518,30 @@ const handleOrderPlacement2 = async () => {
 //     setPlacingOrder(false);
 //   }
 // };
-  const handleAddressAdded = (newAddress) => {
-    console.log("New address added:", newAddress);
+  const handleAddressAdded = async (newAddress) => {
+  console.log("New address added:", newAddress);
+  
+  try {
+    // Fetch fresh addresses from server
+    const profileResponse = await fetch(`${apiUrl}/profile`, {
+      credentials: "include",
+    });
     
-    const addressId = String(newAddress.address_id);
-    const updatedAddresses = [...addresses, newAddress];
-    setAddresses(updatedAddresses);
-    setSelectedAddress(addressId);
-    setShowAddressForm(false);
-    
-    showNotification("New address added successfully!");
-    
-    console.log("Updated addresses:", updatedAddresses);
-    console.log("Selected address ID:", addressId);
-  };
+    if (profileResponse.ok) {
+      const profileData = await profileResponse.json();
+      setAddresses(profileData.addresses);
+      
+      const addressId = String(newAddress.address_id);
+      setSelectedAddress(addressId);
+      setShowAddressForm(false);
+      
+      showNotification("New address added successfully!");
+    }
+  } catch (error) {
+    console.error("Error refreshing addresses:", error);
+    showNotification("Address added but failed to refresh list", "error");
+  }
+};
 
   const formatPrice = (price) => {
     if (typeof price === 'number') {
